@@ -1,0 +1,68 @@
+{
+  "basico": [
+    {
+      "id": 1,
+      "frase": "HOLA"
+    },
+    {
+      "id": 2,
+      "frase": "GATO"
+    },
+    {
+      "id": 3,
+      "frase": "CASA"
+    },
+    {
+      "id": 4,
+      "frase": "AMOR"
+    },
+    {
+      "id": 5,
+      "frase": "LIBRO"
+    }
+  ],
+  "intermedio": [
+    {
+      "id": 1,
+      "frase": "EDUCACION"
+    },
+    {
+      "id": 2,
+      "frase": "COMPUTADORA"
+    },
+    {
+      "id": 3,
+      "frase": "INTELIGENCIA"
+    },
+    {
+      "id": 4,
+      "frase": "AVENTURA"
+    },
+    {
+      "id": 5,
+      "frase": "TECNOLOGIA"
+    }
+  ],
+  "avanzado": [
+    {
+      "id": 1,
+      "frase": "CRIPTOGRAFIA"
+    },
+    {
+      "id": 2,
+      "frase": "DESCODIFICACION"
+    },
+    {
+      "id": 3,
+      "frase": "COMPLEJIDAD"
+    },
+    {
+      "id": 4,
+      "frase": "ALGORITMO"
+    },
+    {
+      "id": 5,
+      "frase": "ENCRIPTACION"
+    }
+  ]
+}
