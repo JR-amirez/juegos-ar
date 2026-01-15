@@ -1795,9 +1795,6 @@ export default function Encriptacion() {
         .enc-ar-three-wrap {
           width: 100%;
           height: 240px;
-          border: 1px solid rgba(255,255,255,0.25);
-          border-radius: 16px;
-          background: rgba(255,255,255,0.10);
           overflow: hidden;
           position: relative;
           z-index: 1;

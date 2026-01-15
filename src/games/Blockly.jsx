@@ -1356,9 +1356,6 @@ const BlocklyARStyles = () => (
     .blockly-ar-three-wrap {
       width: 100%;
       height: 180px;
-      border: 2px solid rgba(255,255,255,0.2);
-      border-radius: 14px;
-      background: rgba(255,255,255,0.06);
       overflow: hidden;
       position: relative;
       z-index: 1;
