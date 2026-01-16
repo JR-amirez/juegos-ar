@@ -132,11 +132,8 @@ const CalculoMental = () => {
         }
     };
 
-    // --- WIZARD: 1) RA -> 2) Juego ---
-    const [setupStep, setSetupStep] = useState(() => {
-        const hasAr = !!localStorage.getItem(LS_KEYS.arConfig) && !!localStorage.getItem(LS_KEYS.arSelectedStages);
-        return hasAr ? "game" : "ar";
-    });
+    // --- WIZARD: 1) RA -> 2) Juego -> 3) Preview ---
+    const [setupStep, setSetupStep] = useState("ar");
 
     const [arSelectedStages, setArSelectedStages] = useState(() =>
         readJson(LS.stages, 'selectedStages', { Inicio: false, Acierto: false, Final: false })
@@ -1250,7 +1247,7 @@ const CalculoMental = () => {
     const goToSummary = () => {
         if (!ensureSwal()) return;
 
-        if (setupStep !== "game") {
+        if (setupStep === "ar") {
             window.Swal.fire("Atención", "Primero completa la Configuración de RA.", "warning");
             return;
         }
@@ -1278,22 +1275,17 @@ const CalculoMental = () => {
 
     const returnToConfig = () => {
         setGameState('config');
+        setSetupStep('game');
     };
 
     // --- LÓGICA DEL JUEGO ---
 
     const handleShowPreview = () => {
-        if (!ensureSwal()) return;
-
-        if (setupStep !== "game") {
-            window.Swal.fire("Atención", "Primero completa la Configuración de RA.", "warning");
-            return;
-        }
-
-        // Guarda también la configuración del juego (namespaced)
+        // Guarda la configuración del juego (namespaced)
         localStorage.setItem(LS_KEYS.gameConfig, JSON.stringify(config));
 
         setGameState("welcome");
+        setSetupStep("preview");
     };
 
 
@@ -1598,6 +1590,10 @@ const CalculoMental = () => {
                     max-height: 100%;
                 }
 
+                .app-layout.single-panel {
+                    justify-content: center;
+                }
+
                 .config-panel, .preview-panel {
                     background: white;
                     padding: 2rem;
@@ -1609,10 +1605,41 @@ const CalculoMental = () => {
                     flex: 1;
                 }
 
+                .config-panel.full-width,
+                .preview-panel.full-width {
+                    flex: none;
+                    width: 100%;
+                }
+
                 .preview-panel {
                     flex: 2;
                     display: flex;
                     flex-direction: column;
+                }
+
+                .preview-content {
+                    flex: 1;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    min-height: 300px;
+                }
+
+                .button-group {
+                    display: flex;
+                    gap: 1rem;
+                    margin-top: 1.5rem;
+                    justify-content: space-between;
+                }
+
+                .game-btn.secondary {
+                    background-color: white;
+                    color: var(--primary-color);
+                    border: 2px solid var(--primary-color);
+                }
+
+                .game-btn.secondary:hover {
+                    background-color: rgba(0, 123, 255, 0.05);
                 }
                 
                 h2 {
@@ -1690,7 +1717,7 @@ const CalculoMental = () => {
                     display: grid;
                     gap: 14px;
                     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-                    max-height: 270px;
+                    max-height: 100%;
                     overflow-y: auto;
                     padding-right: 8px;
                 }
@@ -1982,177 +2009,191 @@ const CalculoMental = () => {
             `}</style>
 
             {/* --- HTML ESTRUCTURA --- */}
-            <div className="app-layout">
-                <div className="config-panel">
-                    <AnimatedTitle />
+            <div className="app-layout single-panel">
+                {/* PASO 1: Configuración de RA */}
+                {setupStep === "ar" && (
+                    <div className="config-panel full-width">
+                        <AnimatedTitle />
 
-                    {setupStep === "ar" ? (
-                        <>
-                            <h2>Configuración de RA</h2>
+                        <div className="form-section ra-config">
+                            <label>Etapas a habilitar:</label>
+                            <div className="ra-stage-list">
+                                {AR_STAGES.map((stage) => (
+                                    <div
+                                        key={stage}
+                                        className={`ra-stage-card ${arSelectedStages[stage] ? "is-active" : ""}`}
+                                    >
+                                        <label className="ra-stage-toggle">
+                                            <input
+                                                type="checkbox"
+                                                checked={!!arSelectedStages[stage]}
+                                                onChange={() => toggleARStage(stage)}
+                                            />
+                                            <span>{stage}</span>
+                                        </label>
 
-                            <div className="form-section ra-config">
-                                <label>Etapas a habilitar:</label>
-                                <div className="ra-stage-list">
-                                    {AR_STAGES.map((stage) => (
-                                        <div
-                                            key={stage}
-                                            className={`ra-stage-card ${arSelectedStages[stage] ? "is-active" : ""}`}
-                                        >
-                                            <label className="ra-stage-toggle">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={!!arSelectedStages[stage]}
-                                                    onChange={() => toggleARStage(stage)}
-                                                />
-                                                <span>{stage}</span>
-                                            </label>
+                                        {arSelectedStages[stage] && (
+                                            <div className="ra-stage-body">
+                                                <label className="ra-field-label">Tipo de contenido:</label>
+                                                <select
+                                                    className="ra-field"
+                                                    value={arConfig?.[stage]?.type ?? "Texto"}
+                                                    onChange={(e) => setARStageType(stage, e.target.value)}
+                                                >
+                                                    {AR_TYPES.map((t) => (
+                                                        <option key={t} value={t}>
+                                                            {t}
+                                                        </option>
+                                                    ))}
+                                                </select>
 
-                                            {arSelectedStages[stage] && (
-                                                <div className="ra-stage-body">
-                                                    <label className="ra-field-label">Tipo de contenido:</label>
-                                                    <select
-                                                        className="ra-field"
-                                                        value={arConfig?.[stage]?.type ?? "Texto"}
-                                                        onChange={(e) => setARStageType(stage, e.target.value)}
-                                                    >
-                                                        {AR_TYPES.map((t) => (
-                                                            <option key={t} value={t}>
-                                                                {t}
-                                                            </option>
-                                                        ))}
-                                                    </select>
+                                                {/* Campos por tipo */}
+                                                {((arConfig?.[stage]?.type ?? "Texto") === "Texto" || (arConfig?.[stage]?.type ?? "Texto") === "Texto3D") && (
+                                                    <>
+                                                        <label className="ra-field-label">Texto:</label>
+                                                        <textarea
+                                                            className="ra-field"
+                                                            value={arConfig?.[stage]?.text ?? ""}
+                                                            onChange={(e) => setARStageField(stage, "text", e.target.value)}
+                                                            rows={3}
+                                                            placeholder="Escribe el mensaje..."
+                                                        />
+                                                    </>
+                                                )}
 
-                                                    {/* Campos por tipo */}
-                                                    {((arConfig?.[stage]?.type ?? "Texto") === "Texto" || (arConfig?.[stage]?.type ?? "Texto") === "Texto3D") && (
-                                                        <>
-                                                            <label className="ra-field-label">Texto:</label>
-                                                            <textarea
-                                                                className="ra-field"
-                                                                value={arConfig?.[stage]?.text ?? ""}
-                                                                onChange={(e) => setARStageField(stage, "text", e.target.value)}
-                                                                rows={3}
-                                                                placeholder="Escribe el mensaje..."
-                                                            />
-                                                        </>
-                                                    )}
+                                                {(arConfig?.[stage]?.type ?? "Texto") === "Imagen" && (
+                                                    <>
+                                                        <label className="ra-field-label">Archivo de imagen:</label>
+                                                        <input
+                                                            className="ra-field"
+                                                            type="file"
+                                                            accept="image/*"
+                                                            onChange={(e) =>
+                                                                handleARStageFileChange(
+                                                                    stage,
+                                                                    "imageUrl",
+                                                                    e.target.files?.[0] ?? null
+                                                                )
+                                                            }
+                                                        />
+                                                    </>
+                                                )}
 
-                                                    {(arConfig?.[stage]?.type ?? "Texto") === "Imagen" && (
-                                                        <>
-                                                            <label className="ra-field-label">Archivo de imagen:</label>
-                                                            <input
-                                                                className="ra-field"
-                                                                type="file"
-                                                                accept="image/*"
-                                                                onChange={(e) =>
-                                                                    handleARStageFileChange(
-                                                                        stage,
-                                                                        "imageUrl",
-                                                                        e.target.files?.[0] ?? null
-                                                                    )
-                                                                }
-                                                            />
-                                                        </>
-                                                    )}
+                                                {(arConfig?.[stage]?.type ?? "Texto") === "Audio" && (
+                                                    <>
+                                                        <label className="ra-field-label">Archivo de audio:</label>
+                                                        <input
+                                                            className="ra-field"
+                                                            type="file"
+                                                            accept="audio/*"
+                                                            onChange={(e) =>
+                                                                handleARStageFileChange(
+                                                                    stage,
+                                                                    "audioUrl",
+                                                                    e.target.files?.[0] ?? null
+                                                                )
+                                                            }
+                                                        />
+                                                    </>
+                                                )}
 
-                                                    {(arConfig?.[stage]?.type ?? "Texto") === "Audio" && (
-                                                        <>
-                                                            <label className="ra-field-label">Archivo de audio:</label>
-                                                            <input
-                                                                className="ra-field"
-                                                                type="file"
-                                                                accept="audio/*"
-                                                                onChange={(e) =>
-                                                                    handleARStageFileChange(
-                                                                        stage,
-                                                                        "audioUrl",
-                                                                        e.target.files?.[0] ?? null
-                                                                    )
-                                                                }
-                                                            />
-                                                        </>
-                                                    )}
-
-                                                    {(arConfig?.[stage]?.type ?? "Texto") === "Video" && (
-                                                        <>
-                                                            <label className="ra-field-label">Archivo de video:</label>
-                                                            <input
-                                                                className="ra-field"
-                                                                type="file"
-                                                                accept="video/*"
-                                                                onChange={(e) =>
-                                                                    handleARStageFileChange(
-                                                                        stage,
-                                                                        "videoUrl",
-                                                                        e.target.files?.[0] ?? null
-                                                                    )
-                                                                }
-                                                            />
-                                                        </>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
+                                                {(arConfig?.[stage]?.type ?? "Texto") === "Video" && (
+                                                    <>
+                                                        <label className="ra-field-label">Archivo de video:</label>
+                                                        <input
+                                                            className="ra-field"
+                                                            type="file"
+                                                            accept="video/*"
+                                                            onChange={(e) =>
+                                                                handleARStageFileChange(
+                                                                    stage,
+                                                                    "videoUrl",
+                                                                    e.target.files?.[0] ?? null
+                                                                )
+                                                            }
+                                                        />
+                                                    </>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
                             </div>
+                        </div>
 
-                            <button className="main-btn" onClick={saveARConfigAndContinue}>
-                                Guardar RA y continuar
+                        <button className="main-btn" onClick={saveARConfigAndContinue}>
+                            Continuar <GrLinkNext style={{ marginLeft: '0.5rem', verticalAlign: 'middle' }} />
+                        </button>
+                    </div>
+                )}
+
+                {/* PASO 2: Configuración del Juego */}
+                {setupStep === "game" && (
+                    <div className="config-panel full-width">
+                        <AnimatedTitle />
+                        <h2>Paso 2: Configuración del Juego</h2>
+
+                        <div className="form-section">
+                            <label htmlFor="level-select">Seleccione el nivel de dificultad:</label>
+                            <select
+                                id="level-select"
+                                value={config.level}
+                                onChange={(e) => setConfig({ ...config, level: e.target.value })}
+                            >
+                                {levels.map((level) => (
+                                    <option key={level} value={level}>
+                                        {level.charAt(0).toUpperCase() + level.slice(1)}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="form-section">
+                            <label htmlFor="exercise-count">Seleccione el número de ejercicios a realizar:</label>
+                            <input
+                                type="number"
+                                id="exercise-count"
+                                value={config.exerciseCount}
+                                onChange={(e) =>
+                                    setConfig({
+                                        ...config,
+                                        exerciseCount: Math.max(1, Math.min(availableCount, parseInt(e.target.value, 10) || 1)),
+                                    })
+                                }
+                                min="1"
+                                max={availableCount}
+                                disabled={availableCount === 0}
+                            />
+                        </div>
+
+                        <div className="button-group">
+                            <button className="game-btn secondary" onClick={() => setSetupStep("ar")}>
+                                <IconArrowBack /> Volver a RA
                             </button>
-                        </>
-                    ) : (
-                        <>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                <h2>Configuración del juego</h2>
-                                <button className="game-btn" onClick={() => setSetupStep("ar")}>
-                                    Editar RA
-                                </button>
-                            </div>
-
-                            <div className="form-section">
-                                <label htmlFor="level-select">Seleccione el nivel de dificultad:</label>
-                                <select
-                                    id="level-select"
-                                    value={config.level}
-                                    onChange={(e) => setConfig({ ...config, level: e.target.value })}
-                                >
-                                    {levels.map((level) => (
-                                        <option key={level} value={level}>
-                                            {level.charAt(0).toUpperCase() + level.slice(1)}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div className="form-section">
-                                <label htmlFor="exercise-count">Seleccione el número de ejercicios a realizar:</label>
-                                <input
-                                    type="number"
-                                    id="exercise-count"
-                                    value={config.exerciseCount}
-                                    onChange={(e) =>
-                                        setConfig({
-                                            ...config,
-                                            exerciseCount: Math.max(1, Math.min(availableCount, parseInt(e.target.value, 10) || 1)),
-                                        })
-                                    }
-                                    min="1"
-                                    max={availableCount}
-                                    disabled={availableCount === 0}
-                                />
-                            </div>
-
                             <button id="preview-btn" className="main-btn" onClick={handleShowPreview}>
-                                Vista Previa
+                                Continuar <GrLinkNext style={{ marginLeft: '0.5rem', verticalAlign: 'middle' }} />
                             </button>
-                        </>
-                    )}
-                </div>
+                        </div>
+                    </div>
+                )}
 
-                <div className="preview-panel">
-                    <h2>Vista Previa:</h2>
-                    {renderPreviewArea()}
-                </div>
+                {/* PASO 3: Vista Previa */}
+                {setupStep === "preview" && (
+                    <div className="preview-panel full-width">
+                        <AnimatedTitle />
+                        <h2>Paso 3: Vista Previa del Juego</h2>
+
+                        <div className="preview-content">
+                            {renderPreviewArea()}
+                        </div>
+
+                        <div className="button-group">
+                            <button className="game-btn secondary" onClick={() => { setSetupStep("game"); setGameState("config"); }}>
+                                <IconArrowBack /> Volver a Configuración
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
         </>
     );
