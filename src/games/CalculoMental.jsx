@@ -1298,6 +1298,14 @@ const CalculoMental = () => {
 
 
     const handleStartGame = async () => {
+        // Borrar datos de realidad aumentada al iniciar el juego
+        localStorage.removeItem(LS_KEYS.arSelectedStages);
+        localStorage.removeItem(LS_KEYS.arConfig);
+        localStorage.removeItem(LS.stages);
+        localStorage.removeItem(LS.config);
+        setArSelectedStages({ Inicio: false, Acierto: false, Final: false });
+        setArConfig({});
+
         // Muestra RA Inicio antes de comenzar (si existe)
         const ok = await showARStageModal('Inicio', {
             confirmButtonText: 'Comenzar',
