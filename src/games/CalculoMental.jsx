@@ -135,10 +135,14 @@ const CalculoMental = () => {
     // --- WIZARD: 1) RA -> 2) Juego -> 3) Preview ---
     const [setupStep, setSetupStep] = useState("ar");
 
+    // Pestaña activa en la configuración de RA
+    const [activeARTab, setActiveARTab] = useState("Inicio");
+
     const [arSelectedStages, setArSelectedStages] = useState(() =>
         readJson(LS.stages, 'selectedStages', { Inicio: false, Acierto: false, Final: false })
     );
 
+    // Nueva estructura: cada etapa puede tener los 4 tipos de contenido
     const [arConfig, setArConfig] = useState(() =>
         readJson(LS.config, 'gameConfig', {})
     );
@@ -207,9 +211,8 @@ const CalculoMental = () => {
         return threeAddonsLoadRef.current;
     };
 
-    // 1) Etapas y tipos (igual que en tu configuración RA anterior)
+    // 1) Etapas de RA
     const AR_STAGES = ['Inicio', 'Acierto', 'Final'];
-    const AR_TYPES = ['Texto', 'Imagen', 'Audio', 'Video'];
 
     const toggleStage = (stage) => {
         setArSelectedStages(prev => ({ ...prev, [stage]: !prev[stage] }));
@@ -254,14 +257,8 @@ const CalculoMental = () => {
 
     const hasStageContent = (stageCfg = {}) => {
         const cfg = normalizeStageConfig(stageCfg);
-        if (!cfg.type) return false;
-
-        if (cfg.type === "Texto" || cfg.type === "Texto3D") return !!cfg.text?.trim();
-        if (cfg.type === "Imagen") return !!cfg.imageUrl?.trim();
-        if (cfg.type === "Audio") return !!cfg.audioUrl?.trim();
-        if (cfg.type === "Video") return !!cfg.videoUrl?.trim();
-
-        return false;
+        // Ahora verifica si hay al menos un tipo de contenido
+        return !!(cfg.text?.trim() || cfg.imageUrl?.trim() || cfg.audioUrl?.trim() || cfg.videoUrl?.trim());
     };
 
     // Símbolos matemáticos (igual que script.js)
@@ -1043,13 +1040,6 @@ const CalculoMental = () => {
         setArSelectedStages((prev) => ({ ...prev, [stage]: !prev[stage] }));
     };
 
-    const setARStageType = (stage, type) => {
-        setArConfig((prev) => ({
-            ...prev,
-            [stage]: { ...(prev[stage] ?? {}), type },
-        }));
-    };
-
     const setARStageField = (stage, field, value) => {
         setArConfig((prev) => ({
             ...prev,
@@ -1079,21 +1069,16 @@ const CalculoMental = () => {
             return { ok: false, msg: "Selecciona al menos una etapa de RA (Inicio/Acierto/Final)." };
         }
 
+        // Verificar que cada etapa habilitada tenga al menos un contenido
         for (const stage of enabledStages) {
             const cfg = arConfig?.[stage] ?? {};
-            if (!cfg.type) return { ok: false, msg: `Selecciona un tipo para la etapa "${stage}".` };
+            const hasText = !!cfg.text?.trim();
+            const hasImage = !!cfg.imageUrl?.trim();
+            const hasAudio = !!cfg.audioUrl?.trim();
+            const hasVideo = !!cfg.videoUrl?.trim();
 
-            if ((cfg.type === "Texto" || cfg.type === "Texto3D") && !cfg.text?.trim()) {
-                return { ok: false, msg: `Escribe un texto para la etapa "${stage}".` };
-            }
-            if (cfg.type === "Imagen" && !cfg.imageUrl?.trim()) {
-                return { ok: false, msg: `Selecciona un archivo de imagen para la etapa "${stage}".` };
-            }
-            if (cfg.type === "Audio" && !cfg.audioUrl?.trim()) {
-                return { ok: false, msg: `Selecciona un archivo de audio para la etapa "${stage}".` };
-            }
-            if (cfg.type === "Video" && !cfg.videoUrl?.trim()) {
-                return { ok: false, msg: `Selecciona un archivo de video para la etapa "${stage}".` };
+            if (!hasText && !hasImage && !hasAudio && !hasVideo) {
+                return { ok: false, msg: `Agrega al menos un contenido para la etapa "${stage}".` };
             }
         }
 
@@ -1105,32 +1090,25 @@ const CalculoMental = () => {
         let body = `<p class="ra-empty">No habilitada.</p>`;
 
         if (isEnabled) {
-            const type = stageCfg?.type;
-            if (!type) {
-                body = `<p class="ra-empty">Sin tipo configurado.</p>`;
-            } else if (type === "Texto" || type === "Texto3D") {
-                const text = stageCfg.text?.trim();
-                body = text
-                    ? `<p class="ra-text">${escapeHtml(text)}</p>`
-                    : `<p class="ra-empty">Texto vacio.</p>`;
-            } else if (type === "Imagen") {
-                const src = stageCfg.imageUrl?.trim();
-                body = src
-                    ? `<img class="ra-media" src="${escapeHtml(src)}" alt="RA ${escapeHtml(stage)}" />`
-                    : `<p class="ra-empty">Sin imagen.</p>`;
-            } else if (type === "Audio") {
-                const src = stageCfg.audioUrl?.trim();
-                body = src
-                    ? `<audio class="ra-audio" controls src="${escapeHtml(src)}"></audio>`
-                    : `<p class="ra-empty">Sin audio.</p>`;
-            } else if (type === "Video") {
-                const src = stageCfg.videoUrl?.trim();
-                body = src
-                    ? `<video class="ra-video" controls src="${escapeHtml(src)}"></video>`
-                    : `<p class="ra-empty">Sin video.</p>`;
-            } else {
-                body = `<p class="ra-empty">Tipo no soportado.</p>`;
+            const contents = [];
+
+            // Verificar cada tipo de contenido
+            if (stageCfg?.text?.trim()) {
+                contents.push(`<div class="ra-content-item"><span class="ra-icon">📝</span> Texto configurado</div>`);
             }
+            if (stageCfg?.imageUrl?.trim()) {
+                contents.push(`<div class="ra-content-item"><span class="ra-icon">🖼️</span> Imagen configurada</div>`);
+            }
+            if (stageCfg?.audioUrl?.trim()) {
+                contents.push(`<div class="ra-content-item"><span class="ra-icon">🎵</span> Audio configurado</div>`);
+            }
+            if (stageCfg?.videoUrl?.trim()) {
+                contents.push(`<div class="ra-content-item"><span class="ra-icon">🎬</span> Video configurado</div>`);
+            }
+
+            body = contents.length > 0
+                ? contents.join("")
+                : `<p class="ra-empty">Sin contenido configurado.</p>`;
         }
 
         return `
@@ -1165,6 +1143,9 @@ const CalculoMental = () => {
         .ra-empty { margin: 0; color: rgba(2, 62, 138, 0.6); }
         .ra-media, .ra-video { width: 100%; border-radius: 10px; display: block; }
         .ra-audio { width: 100%; }
+        .ra-content-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(2, 62, 138, 0.1); }
+        .ra-content-item:last-child { border-bottom: none; }
+        .ra-icon { font-size: 1.1rem; }
       </style>
       <div class="ra-summary">${cards}</div>
     `;
@@ -1626,10 +1607,18 @@ const CalculoMental = () => {
                 }
 
                 .button-group {
-                    display: flex;
+                    display: grid;
+                    width: 100%;
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
                     gap: 1rem;
                     margin-top: 1.5rem;
-                    justify-content: space-between;
+                    justify-content: centar;
+                }
+
+                .button-group > :only-child {
+                    grid-column: 1 / -1;        /* El hijo ocupa toda la fila (ambas columnas) */
+                    justify-self: center;        /* Centra el hijo dentro de esa fila */
+                    width: min(360px, 100%);     /* Opcional: evita que se vea “gigante” en pantallas grandes */
                 }
 
                 .game-btn.secondary {
@@ -1891,7 +1880,6 @@ const CalculoMental = () => {
                 }
 
                 .main-btn {
-                    width: 100%;
                     padding: 0.75rem;
                     font-size: 1.1rem;
                     font-weight: 600;
@@ -2006,6 +1994,179 @@ const CalculoMental = () => {
                 .swal2-cancel:hover {
                     background-color: rgba(0, 123, 255, 0.05) !important;
                 }
+
+                /* === Estilos de Pestañas RA === */
+                .ar-tabs {
+                    display: flex;
+                    gap: 0;
+                    margin-bottom: 1.5rem;
+                    border-bottom: 2px solid #e9ecef;
+                }
+
+                .ar-tab {
+                    flex: 1;
+                    padding: 1rem 1.5rem;
+                    border: none;
+                    background: transparent;
+                    font-size: 1rem;
+                    font-weight: 600;
+                    color: var(--secondary-color);
+                    cursor: pointer;
+                    position: relative;
+                    transition: all 0.3s ease;
+                    font-family: var(--font-family);
+                }
+
+                .ar-tab:hover {
+                    color: var(--primary-color);
+                    background: rgba(0, 123, 255, 0.05);
+                }
+
+                .ar-tab.active {
+                    color: var(--primary-color);
+                }
+
+                .ar-tab.active::after {
+                    content: '';
+                    position: absolute;
+                    bottom: -2px;
+                    left: 0;
+                    right: 0;
+                    height: 3px;
+                    background: var(--primary-color);
+                    border-radius: 3px 3px 0 0;
+                }
+
+                .ar-tab.has-content .tab-indicator {
+                    display: inline-block;
+                    width: 8px;
+                    height: 8px;
+                    background: var(--success-color);
+                    border-radius: 50%;
+                    margin-left: 8px;
+                    vertical-align: middle;
+                }
+
+                .ar-tab-content {
+                    padding: 1.5rem;
+                    background: #f8f9fa;
+                    border-radius: 12px;
+                    margin-bottom: 1.5rem;
+                    min-height: 300px;
+                }
+
+                .ar-tab-header {
+                    margin-bottom: 1.5rem;
+                    padding-bottom: 1rem;
+                    border-bottom: 1px solid #e9ecef;
+                }
+
+                .ar-stage-toggle {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.75rem;
+                    font-weight: 600;
+                    color: var(--dark-color);
+                    cursor: pointer;
+                }
+
+                .ar-stage-toggle input {
+                    width: 20px;
+                    height: 20px;
+                    accent-color: var(--primary-color);
+                    cursor: pointer;
+                }
+
+                .ar-content-cards {
+                    display: grid;
+                    width: 100%;
+                    grid-template-columns: repeat(4, minmax(0, 1fr));
+                    gap: 1rem;
+                }
+
+                .ar-content-card {
+                    width: 100%;
+                    background: white;
+                    border: 2px solid #e9ecef;
+                    border-radius: 12px;
+                    padding: 1rem;
+                    transition: all 0.3s ease;
+                }
+
+                .ar-content-card:hover {
+                    border-color: var(--primary-color);
+                    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.1);
+                }
+
+                .ar-content-card.has-content {
+                    border-color: var(--success-color);
+                    background: linear-gradient(135deg, rgba(40, 167, 69, 0.05), white);
+                }
+
+                .ar-card-header {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    margin-bottom: 1rem;
+                    padding-bottom: 0.75rem;
+                    border-bottom: 1px solid #e9ecef;
+                }
+
+                .ar-card-icon {
+                    font-size: 1.5rem;
+                }
+
+                .ar-card-title {
+                    font-weight: 600;
+                    color: var(--dark-color);
+                    font-size: 1.1rem;
+                }
+
+                .ar-card-body {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.75rem;
+                }
+
+                .ar-preview-image {
+                    max-width: 100%;
+                    max-height: 120px;
+                    object-fit: contain;
+                    border-radius: 8px;
+                    margin-top: 0.5rem;
+                }
+
+                .ar-preview-audio {
+                    width: 100%;
+                    margin-top: 0.5rem;
+                }
+
+                .ar-preview-video {
+                    width: 100%;
+                    max-height: 120px;
+                    border-radius: 8px;
+                    margin-top: 0.5rem;
+                }
+
+                .ar-disabled-message {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    min-height: 200px;
+                    color: var(--secondary-color);
+                    text-align: center;
+                }
+
+                .ar-disabled-message p {
+                    font-size: 1.1rem;
+                    margin: 0;
+                }
+
+                @media (max-width: 768px) {
+                    .ar-content-cards {
+                        grid-template-columns: 1fr;
+                    }
+                }
             `}</style>
 
             {/* --- HTML ESTRUCTURA --- */}
@@ -2015,110 +2176,146 @@ const CalculoMental = () => {
                     <div className="config-panel full-width">
                         <AnimatedTitle />
 
-                        <div className="form-section ra-config">
-                            <label>Etapas a habilitar:</label>
-                            <div className="ra-stage-list">
-                                {AR_STAGES.map((stage) => (
-                                    <div
-                                        key={stage}
-                                        className={`ra-stage-card ${arSelectedStages[stage] ? "is-active" : ""}`}
-                                    >
-                                        <label className="ra-stage-toggle">
-                                            <input
-                                                type="checkbox"
-                                                checked={!!arSelectedStages[stage]}
-                                                onChange={() => toggleARStage(stage)}
-                                            />
-                                            <span>{stage}</span>
-                                        </label>
+                        {/* Pestañas de etapas */}
+                        <div className="ar-tabs">
+                            {AR_STAGES.map((stage) => (
+                                <button
+                                    key={stage}
+                                    className={`ar-tab ${activeARTab === stage ? "active" : ""} ${arSelectedStages[stage] ? "has-content" : ""}`}
+                                    onClick={() => setActiveARTab(stage)}
+                                >
+                                    {stage}
+                                    {arSelectedStages[stage] && <span className="tab-indicator"></span>}
+                                </button>
+                            ))}
+                        </div>
 
-                                        {arSelectedStages[stage] && (
-                                            <div className="ra-stage-body">
-                                                <label className="ra-field-label">Tipo de contenido:</label>
-                                                <select
-                                                    className="ra-field"
-                                                    value={arConfig?.[stage]?.type ?? "Texto"}
-                                                    onChange={(e) => setARStageType(stage, e.target.value)}
-                                                >
-                                                    {AR_TYPES.map((t) => (
-                                                        <option key={t} value={t}>
-                                                            {t}
-                                                        </option>
-                                                    ))}
-                                                </select>
-
-                                                {/* Campos por tipo */}
-                                                {((arConfig?.[stage]?.type ?? "Texto") === "Texto" || (arConfig?.[stage]?.type ?? "Texto") === "Texto3D") && (
-                                                    <>
-                                                        <label className="ra-field-label">Texto:</label>
-                                                        <textarea
-                                                            className="ra-field"
-                                                            value={arConfig?.[stage]?.text ?? ""}
-                                                            onChange={(e) => setARStageField(stage, "text", e.target.value)}
-                                                            rows={3}
-                                                            placeholder="Escribe el mensaje..."
-                                                        />
-                                                    </>
-                                                )}
-
-                                                {(arConfig?.[stage]?.type ?? "Texto") === "Imagen" && (
-                                                    <>
-                                                        <label className="ra-field-label">Archivo de imagen:</label>
-                                                        <input
-                                                            className="ra-field"
-                                                            type="file"
-                                                            accept="image/*"
-                                                            onChange={(e) =>
-                                                                handleARStageFileChange(
-                                                                    stage,
-                                                                    "imageUrl",
-                                                                    e.target.files?.[0] ?? null
-                                                                )
-                                                            }
-                                                        />
-                                                    </>
-                                                )}
-
-                                                {(arConfig?.[stage]?.type ?? "Texto") === "Audio" && (
-                                                    <>
-                                                        <label className="ra-field-label">Archivo de audio:</label>
-                                                        <input
-                                                            className="ra-field"
-                                                            type="file"
-                                                            accept="audio/*"
-                                                            onChange={(e) =>
-                                                                handleARStageFileChange(
-                                                                    stage,
-                                                                    "audioUrl",
-                                                                    e.target.files?.[0] ?? null
-                                                                )
-                                                            }
-                                                        />
-                                                    </>
-                                                )}
-
-                                                {(arConfig?.[stage]?.type ?? "Texto") === "Video" && (
-                                                    <>
-                                                        <label className="ra-field-label">Archivo de video:</label>
-                                                        <input
-                                                            className="ra-field"
-                                                            type="file"
-                                                            accept="video/*"
-                                                            onChange={(e) =>
-                                                                handleARStageFileChange(
-                                                                    stage,
-                                                                    "videoUrl",
-                                                                    e.target.files?.[0] ?? null
-                                                                )
-                                                            }
-                                                        />
-                                                    </>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
+                        {/* Contenido de la pestaña activa */}
+                        <div className="ar-tab-content">
+                            <div className="ar-tab-header">
+                                <label className="ar-stage-toggle">
+                                    <input
+                                        type="checkbox"
+                                        checked={!!arSelectedStages[activeARTab]}
+                                        onChange={() => toggleARStage(activeARTab)}
+                                    />
+                                    <span>Habilitar etapa "{activeARTab}"</span>
+                                </label>
                             </div>
+
+                            {arSelectedStages[activeARTab] && (
+                                <div className="ar-content-cards">
+                                    {/* Tarjeta de Texto */}
+                                    <div className={`ar-content-card ${arConfig?.[activeARTab]?.text?.trim() ? "has-content" : ""}`}>
+                                        <div className="ar-card-header">
+                                            <span className="ar-card-icon">📝</span>
+                                            <span className="ar-card-title">Texto</span>
+                                        </div>
+                                        <div className="ar-card-body">
+                                            <textarea
+                                                className="ra-field"
+                                                value={arConfig?.[activeARTab]?.text ?? ""}
+                                                onChange={(e) => setARStageField(activeARTab, "text", e.target.value)}
+                                                rows={3}
+                                                placeholder="Escribe el mensaje de texto..."
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Tarjeta de Imagen */}
+                                    <div className={`ar-content-card ${arConfig?.[activeARTab]?.imageUrl?.trim() ? "has-content" : ""}`}>
+                                        <div className="ar-card-header">
+                                            <span className="ar-card-icon">🖼️</span>
+                                            <span className="ar-card-title">Imagen</span>
+                                        </div>
+                                        <div className="ar-card-body">
+                                            <input
+                                                className="ra-field"
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={(e) =>
+                                                    handleARStageFileChange(
+                                                        activeARTab,
+                                                        "imageUrl",
+                                                        e.target.files?.[0] ?? null
+                                                    )
+                                                }
+                                            />
+                                            {arConfig?.[activeARTab]?.imageUrl && (
+                                                <img
+                                                    src={arConfig[activeARTab].imageUrl}
+                                                    alt="Preview"
+                                                    className="ar-preview-image"
+                                                />
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Tarjeta de Audio */}
+                                    <div className={`ar-content-card ${arConfig?.[activeARTab]?.audioUrl?.trim() ? "has-content" : ""}`}>
+                                        <div className="ar-card-header">
+                                            <span className="ar-card-icon">🎵</span>
+                                            <span className="ar-card-title">Audio</span>
+                                        </div>
+                                        <div className="ar-card-body">
+                                            <input
+                                                className="ra-field"
+                                                type="file"
+                                                accept="audio/*"
+                                                onChange={(e) =>
+                                                    handleARStageFileChange(
+                                                        activeARTab,
+                                                        "audioUrl",
+                                                        e.target.files?.[0] ?? null
+                                                    )
+                                                }
+                                            />
+                                            {arConfig?.[activeARTab]?.audioUrl && (
+                                                <audio
+                                                    controls
+                                                    src={arConfig[activeARTab].audioUrl}
+                                                    className="ar-preview-audio"
+                                                />
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Tarjeta de Video */}
+                                    <div className={`ar-content-card ${arConfig?.[activeARTab]?.videoUrl?.trim() ? "has-content" : ""}`}>
+                                        <div className="ar-card-header">
+                                            <span className="ar-card-icon">🎬</span>
+                                            <span className="ar-card-title">Video</span>
+                                        </div>
+                                        <div className="ar-card-body">
+                                            <input
+                                                className="ra-field"
+                                                type="file"
+                                                accept="video/*"
+                                                onChange={(e) =>
+                                                    handleARStageFileChange(
+                                                        activeARTab,
+                                                        "videoUrl",
+                                                        e.target.files?.[0] ?? null
+                                                    )
+                                                }
+                                            />
+                                            {arConfig?.[activeARTab]?.videoUrl && (
+                                                <video
+                                                    controls
+                                                    src={arConfig[activeARTab].videoUrl}
+                                                    className="ar-preview-video"
+                                                />
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {!arSelectedStages[activeARTab] && (
+                                <div className="ar-disabled-message">
+                                    <p>Habilita esta etapa para configurar el contenido de Realidad Aumentada.</p>
+                                </div>
+                            )}
                         </div>
 
                         <button className="main-btn" onClick={saveARConfigAndContinue}>
@@ -2131,7 +2328,6 @@ const CalculoMental = () => {
                 {setupStep === "game" && (
                     <div className="config-panel full-width">
                         <AnimatedTitle />
-                        <h2>Paso 2: Configuración del Juego</h2>
 
                         <div className="form-section">
                             <label htmlFor="level-select">Seleccione el nivel de dificultad:</label>
@@ -2181,7 +2377,6 @@ const CalculoMental = () => {
                 {setupStep === "preview" && (
                     <div className="preview-panel full-width">
                         <AnimatedTitle />
-                        <h2>Paso 3: Vista Previa del Juego</h2>
 
                         <div className="preview-content">
                             {renderPreviewArea()}

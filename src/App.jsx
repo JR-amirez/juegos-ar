@@ -15,7 +15,7 @@ function EmbedPlaceholder({ title, id }) {
   return (
     <section className="panel embed-panel">
       <header className="panel-header">
-        <h1>{title}</h1>
+        {/* <h1>{title}</h1> */}
       </header>
       <div className="embed-placeholder">
         <div className="embed-screen">
