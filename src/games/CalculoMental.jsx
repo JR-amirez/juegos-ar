@@ -236,22 +236,38 @@ const CalculoMental = () => {
             .replaceAll("'", '&#039;');
 
     const normalizeStageConfig = (stageCfg = {}) => {
-        const legacyType = stageCfg.Texto
-            ? "Texto"
-            : stageCfg.Imagen
-                ? "Imagen"
-                : stageCfg.Audio
-                    ? "Audio"
-                    : stageCfg.Video
-                        ? "Video"
-                        : undefined;
+        // Extraer valores (compatibilidad con estructura antigua y nueva)
+        const text = stageCfg.text ?? stageCfg.TextoValor ?? "";
+        const imageUrl = stageCfg.imageUrl ?? stageCfg.ImagenUrl ?? "";
+        const audioUrl = stageCfg.audioUrl ?? stageCfg.AudioUrl ?? "";
+        const videoUrl = stageCfg.videoUrl ?? stageCfg.VideoUrl ?? "";
+
+        // Detectar el tipo automáticamente basado en el contenido disponible
+        // Prioridad: Video > Imagen > Audio > Texto
+        let detectedType = stageCfg.type;
+        if (!detectedType) {
+            if (videoUrl?.trim()) detectedType = "Video";
+            else if (imageUrl?.trim()) detectedType = "Imagen";
+            else if (audioUrl?.trim()) detectedType = "Audio";
+            else if (text?.trim()) detectedType = "Texto";
+            // Compatibilidad con estructura legacy
+            else if (stageCfg.Video) detectedType = "Video";
+            else if (stageCfg.Imagen) detectedType = "Imagen";
+            else if (stageCfg.Audio) detectedType = "Audio";
+            else if (stageCfg.Texto) detectedType = "Texto";
+        }
 
         return {
-            type: stageCfg.type ?? legacyType,
-            text: stageCfg.text ?? stageCfg.TextoValor ?? "",
-            imageUrl: stageCfg.imageUrl ?? stageCfg.ImagenUrl ?? "",
-            audioUrl: stageCfg.audioUrl ?? stageCfg.AudioUrl ?? "",
-            videoUrl: stageCfg.videoUrl ?? stageCfg.VideoUrl ?? "",
+            type: detectedType,
+            text,
+            imageUrl,
+            audioUrl,
+            videoUrl,
+            // Nuevos campos para indicar qué contenidos están disponibles
+            hasText: !!text?.trim(),
+            hasImage: !!imageUrl?.trim(),
+            hasAudio: !!audioUrl?.trim(),
+            hasVideo: !!videoUrl?.trim(),
         };
     };
 
@@ -992,6 +1008,329 @@ const CalculoMental = () => {
         return blocks.join('');
     };
 
+    // Construye el HTML para mostrar TODOS los contenidos configurados en una etapa
+    const buildMultiContentHtml = (stageCfg, ids) => {
+        const cfg = normalizeStageConfig(stageCfg);
+
+        // Contar elementos visuales (sin audio)
+        const visualElements = [];
+        if (cfg.hasText) visualElements.push('text');
+        if (cfg.hasImage) visualElements.push('image');
+        if (cfg.hasVideo) visualElements.push('video');
+
+        const visualCount = visualElements.length;
+        const isAudioOnly = cfg.hasAudio && visualCount === 0;
+
+        // Construir elementos individuales
+        const textHtml = cfg.hasText ? `
+            <div class="ar-multi-text-3d">
+                <div id="${ids.textContainerId}" class="ar-three-container"></div>
+            </div>
+        ` : '';
+
+        const imageHtml = cfg.hasImage ? `
+            <div class="ar-multi-image">
+                <div id="${ids.imageContainerId}" class="ar-three-container"></div>
+            </div>
+        ` : '';
+
+        const videoHtml = cfg.hasVideo ? `
+            <div class="ar-multi-video">
+                <div id="${ids.videoContainerId}" class="ar-three-container"></div>
+            </div>
+        ` : '';
+
+        // Audio: nota musical cuando está solo, reproductor oculto cuando hay otros elementos
+        const audioHtml = cfg.hasAudio ? (
+            isAudioOnly
+                ? `<div class="ar-audio-solo">
+                        <div class="ar-audio-icon">🎵</div>
+                        <audio id="${ids.audioId || 'ar-audio-player'}" controls src="${escapeHtml(cfg.audioUrl)}" class="ar-audio-player"></audio>
+                   </div>`
+                : `<div class="ar-audio-hidden">
+                        <audio id="${ids.audioId || 'ar-audio-player'}" autoplay src="${escapeHtml(cfg.audioUrl)}" class="ar-audio-player-bg"></audio>
+                   </div>`
+        ) : '';
+
+        // === LAYOUTS SEGÚN COMBINACIÓN ===
+
+        // 1 elemento visual: centrado
+        if (visualCount === 1) {
+            return `
+                <div class="ar-layout-single">
+                    ${textHtml}${imageHtml}${videoHtml}
+                </div>
+                ${audioHtml}
+            `;
+        }
+
+        // Solo audio: nota musical centrada
+        if (isAudioOnly) {
+            return `
+                <div class="ar-layout-single">
+                    ${audioHtml}
+                </div>
+            `;
+        }
+
+        // 2 elementos visuales
+        if (visualCount === 2) {
+            // Texto + Imagen: texto arriba, imagen abajo
+            if (cfg.hasText && cfg.hasImage) {
+                return `
+                    <div class="ar-layout-text-top">
+                        <div class="ar-row-text">${textHtml}</div>
+                        <div class="ar-row-media">${imageHtml}</div>
+                    </div>
+                    ${audioHtml}
+                `;
+            }
+            // Texto + Video: texto arriba, video abajo
+            if (cfg.hasText && cfg.hasVideo) {
+                return `
+                    <div class="ar-layout-text-top">
+                        <div class="ar-row-text">${textHtml}</div>
+                        <div class="ar-row-media">${videoHtml}</div>
+                    </div>
+                    ${audioHtml}
+                `;
+            }
+            // Imagen + Video: misma fila
+            if (cfg.hasImage && cfg.hasVideo) {
+                return `
+                    <div class="ar-layout-row">
+                        ${imageHtml}
+                        ${videoHtml}
+                    </div>
+                    ${audioHtml}
+                `;
+            }
+        }
+
+        // 3 elementos visuales: Texto + Imagen + Video
+        if (visualCount === 3) {
+            return `
+                <div class="ar-layout-three">
+                    <div class="ar-row-text">${textHtml}</div>
+                    <div class="ar-row-media-pair">
+                        ${imageHtml}
+                        ${videoHtml}
+                    </div>
+                </div>
+                ${audioHtml}
+            `;
+        }
+
+        // Fallback: apilar todo
+        return `${textHtml}${imageHtml}${videoHtml}${audioHtml}`;
+    };
+
+    // Inicializa Three.js para un tipo específico de contenido
+    const initThreeForType = (container, type, content) => {
+        let disposed = false;
+        let renderer, scene, camera, frameId, videoEl;
+
+        const cleanup = () => {
+            disposed = true;
+            if (frameId) cancelAnimationFrame(frameId);
+            if (videoEl) {
+                videoEl.pause();
+                videoEl.src = "";
+                videoEl.load();
+            }
+            if (scene) {
+                scene.traverse((obj) => {
+                    if (obj.geometry) obj.geometry.dispose();
+                    if (obj.material) {
+                        const materials = Array.isArray(obj.material) ? obj.material : [obj.material];
+                        materials.forEach((mat) => {
+                            if (mat.map) mat.map.dispose();
+                            mat.dispose();
+                        });
+                    }
+                });
+            }
+            if (renderer) {
+                renderer.dispose();
+                if (renderer.domElement?.parentNode) {
+                    renderer.domElement.parentNode.removeChild(renderer.domElement);
+                }
+            }
+        };
+
+        ensureThree().then((THREE) => {
+            if (disposed || !container) return;
+
+            const width = container.clientWidth || 300;
+            const height = container.clientHeight || 200;
+
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 100);
+            camera.position.z = 2.5;
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(width, height);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+            renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+            container.innerHTML = "";
+            container.appendChild(renderer.domElement);
+
+            const root = new THREE.Group();
+            scene.add(root);
+
+            if (type === "Texto") {
+                // Iluminación para texto 3D
+                const ambient = new THREE.AmbientLight(0xffffff, 1.2);
+                scene.add(ambient);
+                const dir = new THREE.DirectionalLight(0xffffff, 1.5);
+                dir.position.set(2, 3, 4);
+                scene.add(dir);
+
+                ensureThreeTextAddons()
+                    .then(({ FontLoader, TextGeometry }) => {
+                        if (disposed) return;
+
+                        const loader = new FontLoader();
+                        const fontUrl = "/fonts/helvetiker_regular.typeface.json";
+                        const fallbackFontUrl =
+                            "https://cdn.jsdelivr.net/npm/three@0.160.1/examples/fonts/helvetiker_regular.typeface.json";
+
+                        const buildTextMeshes = (font) => {
+                            const textGroup = new THREE.Group();
+                            root.add(textGroup);
+
+                            const size = 0.3;
+                            const depth = 0.08;
+                            const lineHeight = size * 1.35;
+                            const material = new THREE.MeshStandardMaterial({
+                                color: 0xffffff,
+                                roughness: 0.1,
+                                metalness: 0.0,
+                                emissive: 0xffffff,
+                                emissiveIntensity: 0.2,
+                            });
+
+                            const lines = String(content || "").split(/\r?\n/);
+                            const widths = [];
+
+                            lines.forEach((line, index) => {
+                                const geometry = new TextGeometry(line || " ", {
+                                    font,
+                                    size,
+                                    height: depth,
+                                    curveSegments: 12,
+                                    bevelEnabled: true,
+                                    bevelThickness: 0.01,
+                                    bevelSize: 0.008,
+                                    bevelSegments: 3,
+                                });
+                                geometry.computeBoundingBox();
+
+                                const box = geometry.boundingBox;
+                                const geoWidth = box ? box.max.x - box.min.x : 1;
+                                widths.push(geoWidth);
+
+                                const mesh = new THREE.Mesh(geometry, material);
+                                mesh.position.x = -geoWidth / 2;
+                                mesh.position.y = ((lines.length - 1) / 2 - index) * lineHeight;
+                                textGroup.add(mesh);
+                            });
+
+                            const maxWidth = Math.max(...widths, 1);
+                            const targetWidth = 1.4;
+                            const scale = maxWidth > 0 ? Math.min(1, targetWidth / maxWidth) : 1;
+                            textGroup.scale.setScalar(scale);
+                        };
+
+                        loader.load(
+                            fontUrl,
+                            (font) => !disposed && buildTextMeshes(font),
+                            undefined,
+                            () => {
+                                loader.load(
+                                    fallbackFontUrl,
+                                    (font) => !disposed && buildTextMeshes(font),
+                                    undefined,
+                                    () => console.warn("No se pudo cargar la fuente 3D")
+                                );
+                            }
+                        );
+                    })
+                    .catch(() => console.warn("Error cargando addons de Three.js"));
+
+            } else if (type === "Imagen") {
+                const loader = new THREE.TextureLoader();
+                loader.setCrossOrigin("anonymous");
+                loader.load(content, (texture) => {
+                    if (disposed) return;
+                    texture.colorSpace = THREE.SRGBColorSpace;
+                    const aspect = texture.image.width / texture.image.height;
+                    const planeWidth = aspect >= 1 ? 1.8 : 1.8 * aspect;
+                    const planeHeight = aspect >= 1 ? 1.8 / aspect : 1.8;
+
+                    // Plano frontal
+                    const plane = new THREE.Mesh(
+                        new THREE.PlaneGeometry(planeWidth, planeHeight),
+                        new THREE.MeshBasicMaterial({ map: texture, transparent: true })
+                    );
+                    root.add(plane);
+
+                    // Plano trasero (espejado para que la imagen se vea siempre)
+                    const backTexture = texture.clone();
+                    backTexture.colorSpace = THREE.SRGBColorSpace;
+                    backTexture.wrapS = THREE.RepeatWrapping;
+                    backTexture.repeat.x = -1;
+                    backTexture.offset.x = 1;
+                    backTexture.needsUpdate = true;
+
+                    const planeBack = new THREE.Mesh(
+                        new THREE.PlaneGeometry(planeWidth, planeHeight),
+                        new THREE.MeshBasicMaterial({ map: backTexture, transparent: true })
+                    );
+                    planeBack.rotation.y = Math.PI;
+                    root.add(planeBack);
+                });
+
+            } else if (type === "Video") {
+                videoEl = document.createElement("video");
+                videoEl.src = content;
+                videoEl.crossOrigin = "anonymous";
+                videoEl.loop = true;
+                videoEl.muted = true;
+                videoEl.playsInline = true;
+                videoEl.play().catch(() => {});
+
+                const texture = new THREE.VideoTexture(videoEl);
+                texture.colorSpace = THREE.SRGBColorSpace;
+                const plane = new THREE.Mesh(
+                    new THREE.PlaneGeometry(2.5, 1.4),
+                    new THREE.MeshBasicMaterial({ map: texture, transparent: true })
+                );
+                root.add(plane);
+
+                container.addEventListener("click", () => {
+                    if (videoEl.paused) {
+                        videoEl.muted = false;
+                        videoEl.play().catch(() => {});
+                    } else {
+                        videoEl.pause();
+                    }
+                });
+            }
+
+            const animate = () => {
+                if (disposed) return;
+                root.rotation.y += 0.008;
+                frameId = requestAnimationFrame(animate);
+                renderer.render(scene, camera);
+            };
+            animate();
+        });
+
+        return cleanup;
+    };
+
     const showARStageModal = async (stage, swalOverrides = {}) => {
         // 1) Solo si la etapa está seleccionada
         if (!arSelectedStages?.[stage]) return true;
@@ -1001,16 +1340,23 @@ const CalculoMental = () => {
         if (!hasStageContent(stageCfg)) return true;
         if (!ensureSwal()) return false;
 
-        const containerId = `ra-three-${stage}-${Date.now()}`;
-        const bgId = `cm-ar-bg-${stage}-${Date.now()}`;
+        const cfg = normalizeStageConfig(stageCfg);
+        const timestamp = Date.now();
+        const bgId = `cm-ar-bg-${stage}-${timestamp}`;
+        const ids = {
+            textContainerId: `ar-text-${timestamp}`,
+            imageContainerId: `ar-image-${timestamp}`,
+            videoContainerId: `ar-video-${timestamp}`,
+            audioId: `ar-audio-${timestamp}`,
+        };
 
-        let cleanup;
-        let cleanupThree;
+        const cleanups = [];
         let cleanupSymbols;
 
+        const innerHtml = buildMultiContentHtml(stageCfg, ids);
         const html = cmBuildARDecoratedHtml({
             bgId,
-            innerHtml: `<div class="cm-ar-three-wrap"><div id="${containerId}" class="ra-three-canvas"></div></div>`,
+            innerHtml: `<div class="ar-multi-content">${innerHtml}</div>`,
         });
 
         // 3) Modal tipo script.js (overlay)
@@ -1022,11 +1368,32 @@ const CalculoMental = () => {
                 const bgEl = document.getElementById(bgId);
                 cleanupSymbols = cmCreateFloatingSymbols(bgEl);
 
-                const container = document.getElementById(containerId);
-                if (container) cleanupThree = initThreeStage(container, stageCfg);
+                // Inicializar Three.js para texto 3D si existe
+                if (cfg.hasText) {
+                    const textContainer = document.getElementById(ids.textContainerId);
+                    if (textContainer) {
+                        cleanups.push(initThreeForType(textContainer, "Texto", cfg.text));
+                    }
+                }
+
+                // Inicializar Three.js para imagen si existe
+                if (cfg.hasImage) {
+                    const imageContainer = document.getElementById(ids.imageContainerId);
+                    if (imageContainer) {
+                        cleanups.push(initThreeForType(imageContainer, "Imagen", cfg.imageUrl));
+                    }
+                }
+
+                // Inicializar Three.js para video si existe
+                if (cfg.hasVideo) {
+                    const videoContainer = document.getElementById(ids.videoContainerId);
+                    if (videoContainer) {
+                        cleanups.push(initThreeForType(videoContainer, "Video", cfg.videoUrl));
+                    }
+                }
             },
             willClose: () => {
-                if (cleanupThree) cleanupThree();
+                cleanups.forEach(cleanup => cleanup && cleanup());
                 if (cleanupSymbols) cleanupSymbols();
             },
             ...swalOverrides,
@@ -1271,13 +1638,11 @@ const CalculoMental = () => {
 
 
     const handleStartGame = async () => {
-        // Borrar datos de realidad aumentada al iniciar el juego
+        // Borrar datos de realidad aumentada del localStorage (pero mantener en estado para el juego)
         localStorage.removeItem(LS_KEYS.arSelectedStages);
         localStorage.removeItem(LS_KEYS.arConfig);
         localStorage.removeItem(LS.stages);
         localStorage.removeItem(LS.config);
-        setArSelectedStages({ Inicio: false, Acierto: false, Final: false });
-        setArConfig({});
 
         // Muestra RA Inicio antes de comenzar (si existe)
         const ok = await showARStageModal('Inicio', {
@@ -1345,19 +1710,28 @@ const CalculoMental = () => {
         if (isCorrect) {
             if (!ensureSwal()) return;
             const stageCfg = arConfig?.Acierto ?? {};
+            const cfg = normalizeStageConfig(stageCfg);
             const hasAR = hasStageContent(stageCfg);
-            const containerId = hasAR ? `ra-three-acierto-${Date.now()}` : null;
-            let cleanup;
+            const timestamp = Date.now();
+            const cleanups = [];
             let cleanupSymbols;
             let cameraStream;
-            const bgId = `cm-ar-bg-acierto-${Date.now()}`;
-            const videoId = `cm-ar-video-acierto-${Date.now()}`;
+            const bgId = `cm-ar-bg-acierto-${timestamp}`;
+            const cameraVideoId = `cm-ar-video-acierto-${timestamp}`;
+            const ids = {
+                textContainerId: `ar-text-acierto-${timestamp}`,
+                imageContainerId: `ar-image-acierto-${timestamp}`,
+                videoContainerId: `ar-video-acierto-${timestamp}`,
+                audioId: `ar-audio-acierto-${timestamp}`,
+            };
+
+            const innerHtml = hasAR ? buildMultiContentHtml(stageCfg, ids) : '';
             const html = cmBuildARDecoratedHtml({
                 bgId,
                 topHtml: `<div class="cm-ar-top" style="font-size:1.5rem;">10 Puntos</div>`,
-                innerHtml: `<div class="cm-ar-three-wrap"><div id="${containerId}" class="ra-three-canvas"></div></div>`,
+                innerHtml: `<div class="ar-multi-content">${innerHtml}</div>`,
                 useCamera: true,
-                videoId: videoId,
+                videoId: cameraVideoId,
             });
 
             const result = await window.Swal.fire({
@@ -1369,16 +1743,37 @@ const CalculoMental = () => {
                 cancelButtonText: 'Finalizar juego',
                 confirmButtonColor: '#0077b6',
                 didOpen: async () => {
-                    cameraStream = await startCamera(videoId);
+                    cameraStream = await startCamera(cameraVideoId);
 
                     const bgEl = document.getElementById(bgId);
                     cleanupSymbols = cmCreateFloatingSymbols(bgEl);
 
-                    const container = document.getElementById(containerId);
-                    if (container) cleanup = initThreeStage(container, stageCfg);
+                    // Inicializar Three.js para texto 3D si existe
+                    if (cfg.hasText) {
+                        const textContainer = document.getElementById(ids.textContainerId);
+                        if (textContainer) {
+                            cleanups.push(initThreeForType(textContainer, "Texto", cfg.text));
+                        }
+                    }
+
+                    // Inicializar Three.js para imagen si existe
+                    if (cfg.hasImage) {
+                        const imageContainer = document.getElementById(ids.imageContainerId);
+                        if (imageContainer) {
+                            cleanups.push(initThreeForType(imageContainer, "Imagen", cfg.imageUrl));
+                        }
+                    }
+
+                    // Inicializar Three.js para video si existe
+                    if (cfg.hasVideo) {
+                        const videoContainer = document.getElementById(ids.videoContainerId);
+                        if (videoContainer) {
+                            cleanups.push(initThreeForType(videoContainer, "Video", cfg.videoUrl));
+                        }
+                    }
                 },
                 willClose: () => {
-                    if (cleanup) cleanup();
+                    cleanups.forEach(cleanup => cleanup && cleanup());
                     if (cleanupSymbols) cleanupSymbols();
                     if (cameraStream) stopCamera(cameraStream);
                 },
@@ -1416,16 +1811,24 @@ const CalculoMental = () => {
 
             if (!ensureSwal()) return;
             const stageCfg = arConfig?.Final ?? {};
+            const cfg = normalizeStageConfig(stageCfg);
             const hasAR = hasStageContent(stageCfg);
-            const containerId = hasAR ? `ra-three-final-${Date.now()}` : null;
-            const bgId = `cm-ar-bg-final-${Date.now()}`;
-            let cleanupThree;
+            const timestamp = Date.now();
+            const cleanups = [];
             let cleanupSymbols;
+            const bgId = `cm-ar-bg-final-${timestamp}`;
+            const ids = {
+                textContainerId: `ar-text-final-${timestamp}`,
+                imageContainerId: `ar-image-final-${timestamp}`,
+                videoContainerId: `ar-video-final-${timestamp}`,
+                audioId: `ar-audio-final-${timestamp}`,
+            };
 
+            const innerHtml = hasAR ? buildMultiContentHtml(stageCfg, ids) : '';
             const html = cmBuildARDecoratedHtml({
                 bgId,
                 topHtml: `<div class="cm-ar-top" style="font-size:1.5rem;">Puntuación Final: ${gameData.score + (selectedOption.isCorrect ? 10 : 0)}</div>`,
-                innerHtml: hasAR ? `<div class="cm-ar-three-wrap"><div id="${containerId}" class="ra-three-canvas"></div></div>` : '',
+                innerHtml: `<div class="ar-multi-content">${innerHtml}</div>`,
             });
 
             const result = await window.Swal.fire({
@@ -1440,12 +1843,32 @@ const CalculoMental = () => {
                     const bgEl = document.getElementById(bgId);
                     cleanupSymbols = cmCreateFloatingSymbols(bgEl);
 
-                    if (!hasAR) return;
-                    const container = document.getElementById(containerId);
-                    if (container) cleanupThree = initThreeStage(container, stageCfg);
+                    // Inicializar Three.js para texto 3D si existe
+                    if (cfg.hasText) {
+                        const textContainer = document.getElementById(ids.textContainerId);
+                        if (textContainer) {
+                            cleanups.push(initThreeForType(textContainer, "Texto", cfg.text));
+                        }
+                    }
+
+                    // Inicializar Three.js para imagen si existe
+                    if (cfg.hasImage) {
+                        const imageContainer = document.getElementById(ids.imageContainerId);
+                        if (imageContainer) {
+                            cleanups.push(initThreeForType(imageContainer, "Imagen", cfg.imageUrl));
+                        }
+                    }
+
+                    // Inicializar Three.js para video si existe
+                    if (cfg.hasVideo) {
+                        const videoContainer = document.getElementById(ids.videoContainerId);
+                        if (videoContainer) {
+                            cleanups.push(initThreeForType(videoContainer, "Video", cfg.videoUrl));
+                        }
+                    }
                 },
                 willClose: () => {
-                    if (cleanupThree) cleanupThree();
+                    cleanups.forEach(cleanup => cleanup && cleanup());
                     if (cleanupSymbols) cleanupSymbols();
                 },
             });
@@ -1978,6 +2401,7 @@ const CalculoMental = () => {
 
                 /* SweetAlert2 Customizations */
                 .swal2-popup {
+                    width: auto;
                     border-radius: 28px !important;
                 }
                 .swal2-title {
@@ -2166,6 +2590,141 @@ const CalculoMental = () => {
                     .ar-content-cards {
                         grid-template-columns: 1fr;
                     }
+                }
+
+                /* === Estilos para contenido múltiple en modales RA === */
+                .ar-multi-content {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 1rem;
+                    width: 100%;
+                    margin: 0;
+                }
+
+                /* Layout: 1 elemento centrado */
+                .ar-layout-single {
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    width: 100%;
+                }
+
+                /* Layout: texto arriba, media abajo */
+                .ar-layout-text-top {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 1rem;
+                    width: 100%;
+                }
+
+                .ar-layout-text-top .ar-row-text {
+                    display: flex;
+                    justify-content: center;
+                    width: 100%;
+                }
+
+                .ar-layout-text-top .ar-row-media {
+                    display: flex;
+                    justify-content: center;
+                    width: 100%;
+                }
+
+                /* Layout: elementos en fila (imagen + video) */
+                .ar-layout-row {
+                    display: flex;
+                    flex-direction: row;
+                    justify-content: center;
+                    align-items: center;
+                    gap: 1.5rem;
+                    width: 100%;
+                    flex-wrap: wrap;
+                }
+
+                /* Layout: 3 elementos (texto arriba, imagen+video abajo) */
+                .ar-layout-three {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 1rem;
+                    width: 100%;
+                }
+
+                .ar-layout-three .ar-row-text {
+                    display: flex;
+                    justify-content: center;
+                    width: 100%;
+                }
+
+                .ar-layout-three .ar-row-media-pair {
+                    display: flex;
+                    flex-direction: row;
+                    justify-content: center;
+                    align-items: center;
+                    gap: 1.5rem;
+                    width: 100%;
+                    flex-wrap: wrap;
+                }
+
+                .ar-multi-text-3d {
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                }
+
+                .ar-multi-image,
+                .ar-multi-video {
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    border-radius: 12px;
+                    overflow: hidden;
+                }
+
+                .ar-three-container {
+                    width: 300px;
+                    height: 200px;
+                    border-radius: 12px;
+                }
+
+                /* Audio solo: nota musical centrada */
+                .ar-audio-solo {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 1rem;
+                    padding: 1.5rem;
+                    background: rgba(255, 255, 255, 0.95);
+                    border-radius: 16px;
+                }
+
+                .ar-audio-icon {
+                    font-size: 5rem;
+                    animation: pulse-audio 1.5s ease-in-out infinite;
+                }
+
+                @keyframes pulse-audio {
+                    0%, 100% { transform: scale(1); opacity: 1; }
+                    50% { transform: scale(1.1); opacity: 0.8; }
+                }
+
+                .ar-audio-solo .ar-audio-player {
+                    width: 280px;
+                    height: 40px;
+                }
+
+                /* Audio oculto (cuando hay otros elementos) */
+                .ar-audio-hidden {
+                    position: absolute;
+                    opacity: 0;
+                    pointer-events: none;
+                }
+
+                .ar-audio-player-bg {
+                    width: 1px;
+                    height: 1px;
                 }
             `}</style>
 
