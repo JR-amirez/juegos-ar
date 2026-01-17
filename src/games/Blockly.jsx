@@ -10,7 +10,6 @@ const LS = {
 };
 
 const AR_STAGES = ["Acierto"]; // Solo Acierto para Blockly
-const AR_TYPES = ["Texto", "Imagen", "Audio", "Video"];
 
 const readJSON = (key, fallback) => {
   try {
@@ -270,10 +269,10 @@ function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
       dir.position.set(3, 5, 4);
       scene.add(dir);
 
-      const bgGeo = new THREE.SphereGeometry(18, 32, 32);
+      /* const bgGeo = new THREE.SphereGeometry(18, 32, 32);
       const bgMat = new THREE.MeshBasicMaterial({ color: 0x6366f1, transparent: true, opacity: 0.12, side: THREE.BackSide });
       const bg = new THREE.Mesh(bgGeo, bgMat);
-      scene.add(bg);
+      scene.add(bg); */
 
       const createGlowTexture = () => {
         const canvas = document.createElement("canvas");
@@ -799,6 +798,23 @@ const BlocklyLoader = ({ onLoaded }) => { // Prop renombrada y eliminada la dupl
 // Estilos limitados al contenedor .blockly-scope para evitar afectar otros componentes
 const TailwindStyles = () => (
   <style>{`
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+
+    .blockly-scope {
+      font-family: 'Poppins', sans-serif;
+      color: #343a40;
+      --primary-color: #007bff;
+      --secondary-color: #6c757d;
+      --success-color: #28a745;
+      --danger-color: #dc3545;
+      --light-color: #f8f9fa;
+      --dark-color: #343a40;
+      --confirm-color: #0077b6;
+      --font-family: 'Poppins', sans-serif;
+    }
+
+    .blockly-scope .font-sans { font-family: 'Poppins', sans-serif; }
+
     @keyframes blockly-bounce {
       0%, 100% {
         transform: translateY(-5%) scale(1.05);
@@ -995,11 +1011,6 @@ const BlocklyARStyles = () => (
       50% { transform: scale(1.02); }
     }
 
-    @keyframes ra-glow {
-      0%, 100% { box-shadow: 0 4px 15px rgba(0, 119, 182, 0.25); }
-      50% { box-shadow: 0 6px 20px rgba(0, 119, 182, 0.4); }
-    }
-
     @keyframes ra-float {
       0%, 100% { transform: translateY(0); }
       50% { transform: translateY(-4px); }
@@ -1009,60 +1020,58 @@ const BlocklyARStyles = () => (
     /* Contenedor principal RA */
     /* ===================== */
     .ra-config-container {
-      background: linear-gradient(180deg, #f0f9ff 0%, #e0f2fe 100%);
+      background: white;
       border-radius: 16px;
-      padding: 1.25rem;
-      box-shadow: 0 8px 30px rgba(2, 62, 138, 0.12);
-      border: 1px solid rgba(0, 119, 182, 0.15);
+      padding: 2rem;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+      border: 1px solid rgba(2, 62, 138, 0.12);
       max-width: 100%;
     }
 
     .ra-config-title {
-      background: linear-gradient(135deg, #023e8a 0%, #0077b6 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      font-size: 1.4rem;
+      color: var(--primary-color);
+      font-size: 1.5rem;
       font-weight: 700;
       text-align: center;
-      margin-bottom: 0.25rem;
+      margin-bottom: 0.5rem;
     }
 
     .ra-config-subtitle {
-      color: #64748b;
+      color: var(--secondary-color);
       text-align: center;
-      font-size: 0.85rem;
-      margin-bottom: 1rem;
+      font-size: 0.95rem;
+      margin-bottom: 1.5rem;
     }
 
     /* ===================== */
     /* Tarjetas de etapa RA */
     /* ===================== */
     .ra-stage-list {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      max-height: 100%;
+      overflow-y: auto;
+      padding-right: 8px;
     }
 
     .ra-stage-card {
-      border: 2px solid #e2e8f0;
-      border-radius: 12px;
-      padding: 1rem;
+      border: 1px solid rgba(2, 62, 138, 0.15);
+      border-radius: 14px;
+      padding: 12px 14px;
       background: white;
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
     }
 
     .ra-stage-card:hover {
-      border-color: #90cdf4;
-      box-shadow: 0 4px 12px rgba(0, 119, 182, 0.1);
+      border-color: var(--primary-color);
+      box-shadow: 0 6px 16px rgba(0, 119, 182, 0.12);
     }
 
     .ra-stage-card.is-active {
-      border-color: #0077b6;
-      background: linear-gradient(135deg, rgba(0, 119, 182, 0.04) 0%, rgba(2, 62, 138, 0.04) 100%);
-      box-shadow: 0 6px 18px rgba(0, 119, 182, 0.15);
-      animation: ra-glow 3s ease-in-out infinite;
+      border-color: var(--primary-color);
+      box-shadow: 0 10px 24px rgba(0, 119, 182, 0.2);
+      background: linear-gradient(160deg, rgba(0, 119, 182, 0.08), rgba(255, 255, 255, 0.95));
     }
 
     .ra-stage-toggle {
@@ -1070,95 +1079,42 @@ const BlocklyARStyles = () => (
       gap: 0.6rem;
       align-items: center;
       font-weight: 600;
-      font-size: 1rem;
-      color: #1e293b;
+      color: var(--dark-color);
       cursor: pointer;
       user-select: none;
-      padding: 0.2rem 0;
     }
 
-    .ra-stage-toggle input[type="checkbox"] {
-      appearance: none;
-      -webkit-appearance: none;
-      width: 20px;
-      height: 20px;
-      border: 2px solid #cbd5e1;
-      border-radius: 5px;
-      cursor: pointer;
-      position: relative;
-      transition: all 0.2s ease;
-      background: white;
-      flex-shrink: 0;
-    }
-
-    .ra-stage-toggle input[type="checkbox"]:checked {
-      background: linear-gradient(135deg, #023e8a 0%, #0077b6 100%);
-      border-color: #023e8a;
-    }
-
-    .ra-stage-toggle input[type="checkbox"]:checked::after {
-      content: '✓';
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      color: white;
-      font-size: 12px;
-      font-weight: bold;
-    }
-
-    .ra-stage-toggle input[type="checkbox"]:hover {
-      border-color: #0077b6;
+    .ra-stage-toggle input {
+      accent-color: var(--primary-color);
     }
 
     .ra-stage-body {
       margin-top: 0.75rem;
-      padding: 0.75rem;
-      background: #f8fafc;
-      border-radius: 10px;
+      padding-left: 0.5rem;
       display: grid;
       gap: 0.6rem;
-      border: 1px solid #e2e8f0;
     }
 
     .ra-field-label {
       font-weight: 600;
-      color: #334155;
-      font-size: 0.8rem;
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-    }
-
-    .ra-field-label::before {
-      content: '';
-      width: 3px;
-      height: 3px;
-      background: #0077b6;
-      border-radius: 50%;
+      font-size: 0.9rem;
+      color: var(--dark-color);
     }
 
     .ra-field {
       width: 100%;
-      padding: 0.5rem 0.75rem;
-      border: 2px solid #e2e8f0;
+      padding: 0.65rem 0.75rem;
+      border: 1px solid rgba(2, 62, 138, 0.2);
       border-radius: 8px;
-      font-size: 0.85rem;
-      font-family: inherit;
-      background: white;
-      transition: all 0.2s ease;
-      color: #1e293b;
-      box-sizing: border-box;
+      font-size: 0.95rem;
+      font-family: var(--font-family, 'Poppins', sans-serif);
+      background: #ffffff;
+      color: var(--dark-color);
     }
 
     .ra-field:focus {
-      outline: none;
-      border-color: #0077b6;
-      box-shadow: 0 0 0 3px rgba(0, 119, 182, 0.12);
-    }
-
-    .ra-field::placeholder {
-      color: #94a3b8;
+      outline: 2px solid rgba(0, 119, 182, 0.3);
+      border-color: var(--primary-color);
     }
 
     .ra-field[type="file"] {
@@ -1166,92 +1122,40 @@ const BlocklyARStyles = () => (
       cursor: pointer;
     }
 
-    .ra-field[type="file"]::file-selector-button {
-      background: linear-gradient(135deg, #023e8a 0%, #0077b6 100%);
-      color: white;
-      border: none;
-      padding: 0.4rem 0.75rem;
-      border-radius: 5px;
-      cursor: pointer;
-      font-weight: 500;
-      font-size: 0.8rem;
-      margin-right: 0.5rem;
-      transition: opacity 0.2s ease;
-    }
-
-    .ra-field[type="file"]::file-selector-button:hover {
-      opacity: 0.9;
-    }
-
     .ra-preview-btn {
-      background: linear-gradient(135deg, #0077b6 0%, #023e8a 100%);
-      color: white;
-      border: none;
+      background-color: rgba(0, 119, 182, 0.1);
+      color: var(--dark-color);
+      border: 1px solid rgba(0, 119, 182, 0.3);
       font-weight: 600;
-      padding: 0.5rem 1rem;
+      padding: 0.65rem 1rem;
       border-radius: 8px;
       cursor: pointer;
-      transition: all 0.2s ease;
-      margin-top: 0.4rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.4rem;
-      font-size: 0.85rem;
-      box-shadow: 0 3px 10px rgba(0, 119, 182, 0.2);
+      transition: background-color 0.2s ease;
     }
 
     .ra-preview-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 5px 14px rgba(0, 119, 182, 0.3);
-    }
-
-    .ra-preview-btn:active {
-      transform: translateY(0);
+      background-color: rgba(0, 119, 182, 0.18);
     }
 
     /* ===================== */
-    /* Botón guardar RA */
+    /* Boton guardar RA */
     /* ===================== */
     .ra-save-btn {
-      background: linear-gradient(135deg, #023e8a 0%, #0077b6 100%);
+      background-color: var(--primary-color);
       color: white;
-      font-weight: 700;
-      padding: 0.75rem 1.5rem;
-      border-radius: 10px;
+      font-weight: 600;
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
       border: none;
       cursor: pointer;
       font-size: 1rem;
       width: 100%;
       margin-top: 1rem;
-      transition: all 0.3s ease;
-      box-shadow: 0 4px 15px rgba(2, 62, 138, 0.3);
-      position: relative;
-      overflow: hidden;
-    }
-
-    .ra-save-btn::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: -100%;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-      transition: left 0.5s ease;
+      transition: background-color 0.3s ease;
     }
 
     .ra-save-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 25px rgba(2, 62, 138, 0.4);
-    }
-
-    .ra-save-btn:hover::before {
-      left: 100%;
-    }
-
-    .ra-save-btn:active {
-      transform: translateY(-1px);
+      background-color: #0056b3;
     }
 
     /* ===================== */
@@ -1259,17 +1163,347 @@ const BlocklyARStyles = () => (
     /* ===================== */
     .ra-three-wrap {
       width: 100%;
-      height: 180px;
-      border: 2px solid rgba(0, 119, 182, 0.2);
+      height: 240px;
+      border: 1px solid rgba(2, 62, 138, 0.15);
       border-radius: 12px;
-      background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+      background: #f6fbff;
       overflow: hidden;
-      box-shadow: inset 0 2px 6px rgba(0, 119, 182, 0.08);
     }
 
     .ra-three-canvas {
       width: 100%;
       height: 100%;
+    }
+
+    /* ===================== */
+    /* AR Tabs y tarjetas */
+    /* ===================== */
+    .ar-tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 1.5rem;
+      border-bottom: 2px solid #e9ecef;
+    }
+
+    .ar-tab {
+      flex: 1;
+      padding: 1rem 1.5rem;
+      border: none;
+      background: transparent;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--secondary-color);
+      cursor: pointer;
+      position: relative;
+      transition: all 0.3s ease;
+      font-family: var(--font-family, 'Poppins', sans-serif);
+    }
+
+    .ar-tab:hover {
+      color: var(--primary-color);
+      background: rgba(0, 123, 255, 0.05);
+    }
+
+    .ar-tab.active {
+      color: var(--primary-color);
+    }
+
+    .ar-tab.active::after {
+      content: '';
+      position: absolute;
+      bottom: -2px;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--primary-color);
+      border-radius: 3px 3px 0 0;
+    }
+
+    .ar-tab.has-content .tab-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background: var(--success-color);
+      border-radius: 50%;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+
+    .ar-tab-content {
+      padding: 1.5rem;
+      background: #f8f9fa;
+      border-radius: 12px;
+      margin-bottom: 1.5rem;
+      min-height: 300px;
+    }
+
+    .ar-tab-header {
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid #e9ecef;
+    }
+
+    .ar-stage-toggle {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-weight: 600;
+      color: var(--dark-color);
+      cursor: pointer;
+    }
+
+    .ar-stage-toggle input {
+      width: 20px;
+      height: 20px;
+      accent-color: var(--primary-color);
+      cursor: pointer;
+    }
+
+    .ar-content-cards {
+      display: grid;
+      width: 100%;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1rem;
+    }
+
+    .ar-content-card {
+      width: 100%;
+      background: white;
+      border: 2px solid #e9ecef;
+      border-radius: 12px;
+      padding: 1rem;
+      transition: all 0.3s ease;
+    }
+
+    .ar-content-card:hover {
+      border-color: var(--primary-color);
+      box-shadow: 0 4px 12px rgba(0, 123, 255, 0.1);
+    }
+
+    .ar-content-card.has-content {
+      border-color: var(--success-color);
+      background: linear-gradient(135deg, rgba(40, 167, 69, 0.05), white);
+    }
+
+    .ar-card-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid #e9ecef;
+    }
+
+    .ar-card-icon {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--primary-color);
+    }
+
+    .ar-card-title {
+      font-weight: 600;
+      color: var(--dark-color);
+      font-size: 1.05rem;
+      flex: 1;
+    }
+
+    .ar-delete-btn {
+      background: #ff4757;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s, transform 0.2s;
+      padding: 0;
+      line-height: 1;
+    }
+
+    .ar-delete-btn:hover {
+      background: #ff6b7a;
+      transform: scale(1.1);
+    }
+
+    .ar-card-body {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .ar-preview-image {
+      max-width: 100%;
+      max-height: 120px;
+      object-fit: contain;
+      border-radius: 8px;
+      margin-top: 0.5rem;
+    }
+
+    .ar-preview-audio {
+      width: 100%;
+      margin-top: 0.5rem;
+    }
+
+    .ar-preview-video {
+      width: 100%;
+      max-height: 120px;
+      border-radius: 8px;
+      margin-top: 0.5rem;
+    }
+
+    .ar-disabled-message {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 200px;
+      color: var(--secondary-color);
+      text-align: center;
+    }
+
+    .ar-disabled-message p {
+      font-size: 1.05rem;
+      margin: 0;
+    }
+
+    @media (max-width: 768px) {
+      .ar-content-cards {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* ===================== */
+    /* Multi content layout for modals */
+    /* ===================== */
+    .ar-multi-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      width: 100%;
+      margin: 0;
+    }
+
+    .ar-layout-single {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+    }
+
+    .ar-layout-text-top {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      width: 100%;
+    }
+
+    .ar-layout-text-top .ar-row-text {
+      display: flex;
+      justify-content: center;
+      width: 100%;
+    }
+
+    .ar-layout-text-top .ar-row-media {
+      display: flex;
+      justify-content: center;
+      width: 100%;
+    }
+
+    .ar-layout-row {
+      display: flex;
+      flex-direction: row;
+      justify-content: center;
+      align-items: center;
+      gap: 1.5rem;
+      width: 100%;
+      flex-wrap: wrap;
+    }
+
+    .ar-layout-three {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      width: 100%;
+    }
+
+    .ar-layout-three .ar-row-text {
+      display: flex;
+      justify-content: center;
+      width: 100%;
+    }
+
+    .ar-layout-three .ar-row-media-pair {
+      display: flex;
+      flex-direction: row;
+      justify-content: center;
+      align-items: center;
+      gap: 1.5rem;
+      width: 100%;
+      flex-wrap: wrap;
+    }
+
+    .ar-multi-text-3d {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .ar-multi-image,
+    .ar-multi-video {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .ar-three-container {
+      width: 300px;
+      height: 200px;
+      border-radius: 12px;
+    }
+
+    .ar-audio-solo {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      padding: 1.5rem;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 16px;
+    }
+
+    .ar-audio-icon {
+      font-size: 3.5rem;
+      animation: pulse-audio 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse-audio {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.1); opacity: 0.8; }
+    }
+
+    .ar-audio-solo .ar-audio-player {
+      width: 280px;
+      height: 40px;
+    }
+
+    .ar-audio-hidden {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .ar-audio-player-bg {
+      width: 1px;
+      height: 1px;
     }
 
     /* ===================== */
@@ -1279,30 +1513,19 @@ const BlocklyARStyles = () => (
       position: relative;
       min-height: 220px;
       width: 100%;
-      background: linear-gradient(135deg, #023e8a 0%, #0077b6 50%, #00a8e8 100%);
+      background: linear-gradient(135deg, #0077b6 0%, #023e8a 100%);
       overflow: hidden;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 1rem;
-      padding: 1rem;
-      border-radius: 16px;
-    }
-
-    .blockly-ar-bg::before {
-      content: '';
-      position: absolute;
-      top: -50%;
-      left: -50%;
-      width: 200%;
-      height: 200%;
-      background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
-      animation: ra-float 6s ease-in-out infinite;
+      gap: 1.2rem;
+      padding: 1.2rem 0;
+      border-radius: 28px;
     }
 
     .blockly-ar-bg-camera {
-      background: rgba(0, 0, 0, 0.8);
+      background: transparent;
     }
 
     .blockly-ar-camera-bg {
@@ -1313,25 +1536,24 @@ const BlocklyARStyles = () => (
       height: 100%;
       object-fit: cover;
       z-index: 0;
-      border-radius: 16px;
-      filter: brightness(0.9);
+      border-radius: 28px;
+      background: none;
     }
 
     .blockly-ar-bg-elements {
       position: absolute;
       inset: 0;
-      background:
-        radial-gradient(circle at 15% 15%, rgba(255,255,255,0.12) 0%, transparent 40%),
-        radial-gradient(circle at 85% 85%, rgba(255,255,255,0.08) 0%, transparent 40%),
-        radial-gradient(circle at 50% 50%, rgba(255,255,255,0.04) 0%, transparent 60%);
       pointer-events: none;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(255,255,255,0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(255,255,255,0.1) 0%, transparent 50%);
     }
 
     .blockly-ar-content {
       position: relative;
       z-index: 2;
       width: 100%;
-      padding: 0 0.75rem;
+      padding: 0 1rem;
       box-sizing: border-box;
       display: flex;
       flex-direction: column;
@@ -1340,115 +1562,76 @@ const BlocklyARStyles = () => (
     }
 
     .blockly-ar-top {
-      color: #fef08a;
-      font-weight: 700;
-      font-size: 1.2rem;
-      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+      color: #ffd60a;
+      font-weight: 800;
+      text-shadow: 2px 2px 8px #3a0ca3, 0 0 20px rgba(0,0,0,0.8);
       text-align: center;
-      background: linear-gradient(135deg, rgba(0, 0, 0, 0.45) 0%, rgba(0, 0, 0, 0.25) 100%);
-      padding: 0.75rem 1.5rem;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 0.8rem 1.5rem;
       border-radius: 12px;
-      backdrop-filter: blur(8px);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      animation: ra-pulse 2s ease-in-out infinite;
+      backdrop-filter: blur(5px);
     }
 
     .blockly-ar-three-wrap {
       width: 100%;
-      height: 180px;
+      height: 240px;
       overflow: hidden;
       position: relative;
       z-index: 1;
-      backdrop-filter: blur(4px);
-      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
     }
 
     /* ===================== */
     /* SweetAlert2 customizations */
     /* ===================== */
     .swal2-popup {
-      border-radius: 16px !important;
-      padding: 1.25rem !important;
-      box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.2) !important;
+      border-radius: 28px !important;
+      width: auto;
     }
 
     .swal2-title {
-      font-family: inherit !important;
-      font-weight: 700 !important;
-      color: #1e293b !important;
+      font-family: 'Poppins', sans-serif !important;
     }
 
     .swal2-html-container {
-      font-family: inherit !important;
+      font-family: 'Poppins', sans-serif !important;
     }
 
     .swal2-confirm {
-      background: linear-gradient(135deg, #023e8a 0%, #0077b6 100%) !important;
-      border-radius: 10px !important;
+      background-color: #0077b6 !important;
+      border-radius: 8px !important;
       font-weight: 600 !important;
       padding: 0.6rem 1.25rem !important;
-      transition: all 0.2s ease !important;
-    }
-
-    .swal2-confirm:hover {
-      transform: translateY(-2px) !important;
-      box-shadow: 0 5px 15px rgba(0, 119, 182, 0.35) !important;
     }
 
     .swal2-cancel {
       background-color: white !important;
-      color: #023e8a !important;
-      border: 2px solid #023e8a !important;
-      border-radius: 10px !important;
+      color: #0077b6 !important;
+      border: 2px solid #0077b6 !important;
+      border-radius: 8px !important;
       font-weight: 600 !important;
       padding: 0.6rem 1.25rem !important;
-      transition: all 0.2s ease !important;
     }
 
     .swal2-cancel:hover {
-      background-color: #f0f9ff !important;
-      transform: translateY(-2px) !important;
-    }
-
-    .swal2-icon.swal2-success {
-      border-color: #22c55e !important;
-      color: #22c55e !important;
-    }
-
-    .swal2-icon.swal2-success [class^='swal2-success-line'] {
-      background-color: #22c55e !important;
-    }
-
-    .swal2-icon.swal2-success .swal2-success-ring {
-      border-color: rgba(34, 197, 94, 0.3) !important;
+      background-color: rgba(0, 123, 255, 0.05) !important;
     }
 
     /* ===================== */
-    /* Botón editar RA */
+    /* Boton editar RA */
     /* ===================== */
     .ra-edit-btn {
-      background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
-      color: #023e8a;
+      background-color: rgba(0, 119, 182, 0.1);
+      color: var(--dark-color);
+      border: 1px solid rgba(0, 119, 182, 0.3);
       font-weight: 600;
       padding: 0.5rem 1rem;
       border-radius: 8px;
-      border: 2px solid #7dd3fc;
       cursor: pointer;
-      transition: all 0.2s ease;
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-      font-size: 0.9rem;
+      transition: background-color 0.2s ease;
     }
 
     .ra-edit-btn:hover {
-      background: linear-gradient(135deg, #bae6fd 0%, #7dd3fc 100%);
-      transform: translateY(-2px);
-      box-shadow: 0 4px 10px rgba(0, 119, 182, 0.2);
-    }
-
-    .ra-edit-btn::before {
-      content: '⚙️';
+      background-color: rgba(0, 119, 182, 0.18);
     }
   `}</style>
 );
@@ -2170,8 +2353,7 @@ const SetupScreen = ({ onGameStart, onEditAR }) => {
       <div className="flex justify-end mb-4">
         <button
           onClick={onEditAR}
-          className="font-semibold py-2 px-4 rounded-lg border transition-colors duration-200"
-          style={{ backgroundColor: '#e0f2fe', color: '#023e8a', borderColor: '#7dd3fc' }}
+          className="ra-edit-btn"
         >
           Editar RA
         </button>
@@ -2633,13 +2815,16 @@ const BlocklyChallenge = () => {
   // Siempre empieza en 'ar' para configurar primero la RA
   const [setupStep, setSetupStep] = useState("ar");
 
+  // Pestaña activa en la configuración de RA
+  const [activeARTab, setActiveARTab] = useState(AR_STAGES[0] ?? "Acierto");
+
   // Estado RA (solo Acierto)
   const [arSelectedStages, setArSelectedStages] = useState(() =>
     readJSON(LS.arStages, { Acierto: false })
   );
 
   const [arConfig, setArConfig] = useState(() =>
-    readJSON(LS.arConfig, { Acierto: { type: "Texto", text: "" } })
+    readJSON(LS.arConfig, { Acierto: {} })
   );
 
   // Referencias para ObjectURLs de medios
@@ -2679,13 +2864,6 @@ const BlocklyChallenge = () => {
     setArSelectedStages((prev) => ({ ...prev, [stage]: !prev[stage] }));
   };
 
-  const setARStageType = (stage, type) => {
-    setArConfig((prev) => ({
-      ...prev,
-      [stage]: { ...(prev[stage] ?? {}), type },
-    }));
-  };
-
   const setARStageField = (stage, field, value) => {
     setArConfig((prev) => ({
       ...prev,
@@ -2719,19 +2897,13 @@ const BlocklyChallenge = () => {
 
     for (const stage of enabledStages) {
       const cfg = arConfig?.[stage] ?? {};
-      if (!cfg.type) return { ok: false, msg: `Selecciona un tipo para la etapa "${stage}".` };
+      const hasText = !!cfg.text?.trim();
+      const hasImage = !!cfg.imageUrl?.trim();
+      const hasAudio = !!cfg.audioUrl?.trim();
+      const hasVideo = !!cfg.videoUrl?.trim();
 
-      if (cfg.type === "Texto" && !cfg.text?.trim()) {
-        return { ok: false, msg: `Escribe un texto para la etapa "${stage}".` };
-      }
-      if (cfg.type === "Imagen" && !cfg.imageUrl?.trim()) {
-        return { ok: false, msg: `Selecciona una imagen para la etapa "${stage}".` };
-      }
-      if (cfg.type === "Audio" && !cfg.audioUrl?.trim()) {
-        return { ok: false, msg: `Selecciona un audio para la etapa "${stage}".` };
-      }
-      if (cfg.type === "Video" && !cfg.videoUrl?.trim()) {
-        return { ok: false, msg: `Selecciona un video para la etapa "${stage}".` };
+      if (!hasText && !hasImage && !hasAudio && !hasVideo) {
+        return { ok: false, msg: `Agrega al menos un contenido para la etapa "${stage}".` };
       }
     }
 
@@ -2746,13 +2918,139 @@ const BlocklyChallenge = () => {
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#039;");
 
-  const hasStageContent = (stageCfg) => {
-    if (!stageCfg?.type) return false;
-    if (stageCfg.type === "Texto") return !!stageCfg.text?.trim();
-    if (stageCfg.type === "Imagen") return !!stageCfg.imageUrl?.trim();
-    if (stageCfg.type === "Audio") return !!stageCfg.audioUrl?.trim();
-    if (stageCfg.type === "Video") return !!stageCfg.videoUrl?.trim();
-    return false;
+  const normalizeStageConfig = (stageCfg = {}) => {
+    const text = stageCfg.text ?? "";
+    const imageUrl = stageCfg.imageUrl ?? "";
+    const audioUrl = stageCfg.audioUrl ?? "";
+    const videoUrl = stageCfg.videoUrl ?? "";
+
+    let detectedType = stageCfg.type;
+    if (!detectedType) {
+      if (videoUrl?.trim()) detectedType = "Video";
+      else if (imageUrl?.trim()) detectedType = "Imagen";
+      else if (audioUrl?.trim()) detectedType = "Audio";
+      else if (text?.trim()) detectedType = "Texto";
+    }
+
+    return {
+      type: detectedType,
+      text,
+      imageUrl,
+      audioUrl,
+      videoUrl,
+      hasText: !!text?.trim(),
+      hasImage: !!imageUrl?.trim(),
+      hasAudio: !!audioUrl?.trim(),
+      hasVideo: !!videoUrl?.trim(),
+    };
+  };
+
+  const hasStageContent = (stageCfg = {}) => {
+    const cfg = normalizeStageConfig(stageCfg);
+    return !!(cfg.text?.trim() || cfg.imageUrl?.trim() || cfg.audioUrl?.trim() || cfg.videoUrl?.trim());
+  };
+
+  const buildMultiContentHtml = (stageCfg, ids) => {
+    const cfg = normalizeStageConfig(stageCfg);
+
+    const visualElements = [];
+    if (cfg.hasText) visualElements.push("text");
+    if (cfg.hasImage) visualElements.push("image");
+    if (cfg.hasVideo) visualElements.push("video");
+
+    const visualCount = visualElements.length;
+    const isAudioOnly = cfg.hasAudio && visualCount === 0;
+
+    const textHtml = cfg.hasText ? `
+      <div class="ar-multi-text-3d">
+        <div id="${ids.textContainerId}" class="ar-three-container"></div>
+      </div>
+    ` : "";
+
+    const imageHtml = cfg.hasImage ? `
+      <div class="ar-multi-image">
+        <div id="${ids.imageContainerId}" class="ar-three-container"></div>
+      </div>
+    ` : "";
+
+    const videoHtml = cfg.hasVideo ? `
+      <div class="ar-multi-video">
+        <div id="${ids.videoContainerId}" class="ar-three-container"></div>
+      </div>
+    ` : "";
+
+    const audioHtml = cfg.hasAudio ? (
+      isAudioOnly
+        ? `<div class="ar-audio-solo">
+            <div class="ar-audio-icon">&#9835;</div>
+            <audio id="${ids.audioId || "ar-audio-player"}" controls src="${escapeHtml(cfg.audioUrl)}" class="ar-audio-player"></audio>
+           </div>`
+        : `<div class="ar-audio-hidden">
+            <audio id="${ids.audioId || "ar-audio-player"}" autoplay src="${escapeHtml(cfg.audioUrl)}" class="ar-audio-player-bg"></audio>
+           </div>`
+    ) : "";
+
+    if (visualCount === 1) {
+      return `
+        <div class="ar-layout-single">
+          ${textHtml}${imageHtml}${videoHtml}
+        </div>
+        ${audioHtml}
+      `;
+    }
+
+    if (isAudioOnly) {
+      return `
+        <div class="ar-layout-single">
+          ${audioHtml}
+        </div>
+      `;
+    }
+
+    if (visualCount === 2) {
+      if (cfg.hasText && cfg.hasImage) {
+        return `
+          <div class="ar-layout-text-top">
+            <div class="ar-row-text">${textHtml}</div>
+            <div class="ar-row-media">${imageHtml}</div>
+          </div>
+          ${audioHtml}
+        `;
+      }
+      if (cfg.hasText && cfg.hasVideo) {
+        return `
+          <div class="ar-layout-text-top">
+            <div class="ar-row-text">${textHtml}</div>
+            <div class="ar-row-media">${videoHtml}</div>
+          </div>
+          ${audioHtml}
+        `;
+      }
+      if (cfg.hasImage && cfg.hasVideo) {
+        return `
+          <div class="ar-layout-row">
+            ${imageHtml}
+            ${videoHtml}
+          </div>
+          ${audioHtml}
+        `;
+      }
+    }
+
+    if (visualCount === 3) {
+      return `
+        <div class="ar-layout-three">
+          <div class="ar-row-text">${textHtml}</div>
+          <div class="ar-row-media-pair">
+            ${imageHtml}
+            ${videoHtml}
+          </div>
+        </div>
+        ${audioHtml}
+      `;
+    }
+
+    return `${textHtml}${imageHtml}${videoHtml}${audioHtml}`;
   };
 
   const showARStageModal = async (stage, swalOverrides = {}) => {
@@ -2762,18 +3060,27 @@ const BlocklyChallenge = () => {
     if (!hasStageContent(stageCfg)) return true;
     if (!window.Swal) return false;
 
-    const containerId = `ra-three-${stage}-${Date.now()}`;
-    const bgId = `blockly-ar-bg-${stage}-${Date.now()}`;
-    const videoId = `blockly-ar-video-${stage}-${Date.now()}`;
+    const cfg = normalizeStageConfig(stageCfg);
+    const timestamp = Date.now();
+    const bgId = `blockly-ar-bg-${stage}-${timestamp}`;
+    const videoId = `blockly-ar-video-${stage}-${timestamp}`;
     const useCamera = stage === 'Acierto';
 
-    let cleanupThree;
+    const ids = {
+      textContainerId: `ar-text-${timestamp}`,
+      imageContainerId: `ar-image-${timestamp}`,
+      videoContainerId: `ar-video-${timestamp}`,
+      audioId: `ar-audio-${timestamp}`,
+    };
+
+    const cleanups = [];
     let cleanupSymbols;
     let cameraStream;
 
+    const innerHtml = buildMultiContentHtml(stageCfg, ids);
     const html = buildDecoratedHtml({
       bgId,
-      innerHtml: `<div class="blockly-ar-three-wrap"><div id="${containerId}" class="ra-three-canvas"></div></div>`,
+      innerHtml: `<div class="ar-multi-content">${innerHtml}</div>`,
       useCamera,
       videoId,
     });
@@ -2790,11 +3097,21 @@ const BlocklyChallenge = () => {
         const bgEl = document.getElementById(bgId);
         cleanupSymbols = createFloatingSymbols(bgEl);
 
-        const container = document.getElementById(containerId);
-        if (container) cleanupThree = initThreeStage(container, stageCfg);
+        if (cfg.hasText) {
+          const container = document.getElementById(ids.textContainerId);
+          if (container) cleanups.push(initThreeStage(container, { type: "Texto", text: cfg.text }));
+        }
+        if (cfg.hasImage) {
+          const container = document.getElementById(ids.imageContainerId);
+          if (container) cleanups.push(initThreeStage(container, { type: "Imagen", imageUrl: cfg.imageUrl }));
+        }
+        if (cfg.hasVideo) {
+          const container = document.getElementById(ids.videoContainerId);
+          if (container) cleanups.push(initThreeStage(container, { type: "Video", videoUrl: cfg.videoUrl }));
+        }
       },
       willClose: () => {
-        if (cleanupThree) cleanupThree();
+        cleanups.forEach((cleanup) => cleanup && cleanup());
         if (cleanupSymbols) cleanupSymbols();
         if (cameraStream) stopCamera(cameraStream);
       },
@@ -2809,30 +3126,24 @@ const BlocklyChallenge = () => {
     let body = `<p class="ra-empty">No habilitada.</p>`;
 
     if (isEnabled) {
-      const type = stageCfg?.type;
-      if (!type) {
-        body = `<p class="ra-empty">Sin tipo configurado.</p>`;
-      } else if (type === "Texto") {
-        const text = stageCfg.text?.trim();
-        body = text
-          ? `<p class="ra-text">${escapeHtml(text)}</p>`
-          : `<p class="ra-empty">Texto vacío.</p>`;
-      } else if (type === "Imagen") {
-        const src = stageCfg.imageUrl?.trim();
-        body = src
-          ? `<img class="ra-media" src="${escapeHtml(src)}" alt="RA ${escapeHtml(stage)}" />`
-          : `<p class="ra-empty">Sin imagen.</p>`;
-      } else if (type === "Audio") {
-        const src = stageCfg.audioUrl?.trim();
-        body = src
-          ? `<audio class="ra-audio" controls src="${escapeHtml(src)}"></audio>`
-          : `<p class="ra-empty">Sin audio.</p>`;
-      } else if (type === "Video") {
-        const src = stageCfg.videoUrl?.trim();
-        body = src
-          ? `<video class="ra-video" controls src="${escapeHtml(src)}"></video>`
-          : `<p class="ra-empty">Sin video.</p>`;
+      const contents = [];
+
+      if (stageCfg?.text?.trim()) {
+        contents.push(`<div class="ra-content-item"><span class="ra-icon">TXT</span> Texto configurado</div>`);
       }
+      if (stageCfg?.imageUrl?.trim()) {
+        contents.push(`<div class="ra-content-item"><span class="ra-icon">IMG</span> Imagen configurada</div>`);
+      }
+      if (stageCfg?.audioUrl?.trim()) {
+        contents.push(`<div class="ra-content-item"><span class="ra-icon">AUD</span> Audio configurado</div>`);
+      }
+      if (stageCfg?.videoUrl?.trim()) {
+        contents.push(`<div class="ra-content-item"><span class="ra-icon">VID</span> Video configurado</div>`);
+      }
+
+      body = contents.length > 0
+        ? contents.join("")
+        : `<p class="ra-empty">Sin contenido configurado.</p>`;
     }
 
     return `
@@ -2856,17 +3167,20 @@ const BlocklyChallenge = () => {
     return `
       <style>
         .ra-summary { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); text-align: left; }
-        .ra-card { border: 1px solid rgba(0, 119, 182, 0.18); border-radius: 14px; padding: 14px; background: #ffffff; }
+        .ra-card { border: 1px solid rgba(2, 62, 138, 0.18); border-radius: 14px; padding: 14px; background: #ffffff; }
         .ra-card.is-off { opacity: 0.7; }
         .ra-card-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
         .ra-title { font-weight: 700; color: #023e8a; }
         .ra-status { font-size: 0.8rem; color: #0077b6; background: rgba(0,119,182,0.12); padding: 2px 8px; border-radius: 999px; }
-        .ra-card.is-off .ra-status { color: #6b7280; background: rgba(107,114,128,0.08); }
-        .ra-card-body { color: #374151; font-size: 0.9rem; }
+        .ra-card.is-off .ra-status { color: #023e8a; background: rgba(2,62,138,0.08); }
+        .ra-card-body { color: #023e8a; font-size: 0.9rem; }
         .ra-text { margin: 0; white-space: pre-wrap; }
-        .ra-empty { margin: 0; color: rgba(107, 114, 128, 0.6); }
+        .ra-empty { margin: 0; color: rgba(2, 62, 138, 0.6); }
         .ra-media, .ra-video { width: 100%; border-radius: 10px; display: block; }
         .ra-audio { width: 100%; }
+        .ra-content-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(2, 62, 138, 0.1); }
+        .ra-content-item:last-child { border-bottom: none; }
+        .ra-icon { font-size: 0.85rem; font-weight: 700; color: #023e8a; }
       </style>
       <div class="ra-summary">${cards}</div>
     `;
@@ -2943,104 +3257,186 @@ const BlocklyChallenge = () => {
   const renderARConfig = () => (
     <div className="w-full max-w-2xl mx-auto p-4 md:p-8">
       <div className="ra-config-container">
-        <h2 className="ra-config-title">Configuración de Realidad Aumentada</h2>
+        <h2 className="ra-config-title">Configuracion de Realidad Aumentada</h2>
         <p className="ra-config-subtitle">
-          Configura el contenido que se mostrará cuando el jugador acierte un desafío.
+          Configura el contenido que se mostrara cuando el jugador acierte un desafio.
         </p>
 
-        <div className="ra-stage-list">
+        <div className="ar-tabs">
           {AR_STAGES.map((stage) => (
-            <div
+            <button
               key={stage}
-              className={`ra-stage-card ${arSelectedStages?.[stage] ? "is-active" : ""}`}
+              className={`ar-tab ${activeARTab === stage ? "active" : ""} ${arSelectedStages?.[stage] ? "has-content" : ""}`}
+              onClick={() => setActiveARTab(stage)}
             >
-              <label className="ra-stage-toggle">
-                <input
-                  type="checkbox"
-                  checked={!!arSelectedStages?.[stage]}
-                  onChange={() => toggleARStage(stage)}
-                />
-                <span>Habilitar etapa {stage}</span>
-              </label>
+              {stage}
+              {arSelectedStages?.[stage] && <span className="tab-indicator"></span>}
+            </button>
+          ))}
+        </div>
 
-              {arSelectedStages?.[stage] && (
-                <div className="ra-stage-body">
-                  <label className="ra-field-label">Tipo de contenido</label>
-                  <select
-                    className="ra-field"
-                    value={arConfig?.[stage]?.type ?? "Texto"}
-                    onChange={(e) => setARStageType(stage, e.target.value)}
-                  >
-                    {AR_TYPES.map((t) => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
+        <div className="ar-tab-content">
+          <div className="ar-tab-header">
+            <label className="ar-stage-toggle">
+              <input
+                type="checkbox"
+                checked={!!arSelectedStages?.[activeARTab]}
+                onChange={() => toggleARStage(activeARTab)}
+              />
+              <span>Habilitar etapa "{activeARTab}"</span>
+            </label>
+          </div>
 
-                  {arConfig?.[stage]?.type === "Texto" && (
-                    <>
-                      <label className="ra-field-label">Texto a mostrar (máx. 20 caracteres)</label>
-                      <textarea
-                        className="ra-field"
-                        rows={3}
-                        value={arConfig?.[stage]?.text ?? ""}
-                        onChange={(e) => setARStageField(stage, "text", e.target.value.slice(0, 20))}
-                        placeholder="Escribe el mensaje de felicitación..."
-                      />
-                    </>
-                  )}
-
-                  {arConfig?.[stage]?.type === "Imagen" && (
-                    <>
-                      <label className="ra-field-label">Seleccionar imagen</label>
-                      <input
-                        className="ra-field"
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) =>
-                          handleARStageFileChange(stage, "imageUrl", e.target.files?.[0] ?? null)
-                        }
-                      />
-                    </>
-                  )}
-
-                  {arConfig?.[stage]?.type === "Audio" && (
-                    <>
-                      <label className="ra-field-label">Seleccionar audio</label>
-                      <input
-                        className="ra-field"
-                        type="file"
-                        accept="audio/*"
-                        onChange={(e) =>
-                          handleARStageFileChange(stage, "audioUrl", e.target.files?.[0] ?? null)
-                        }
-                      />
-                    </>
-                  )}
-
-                  {arConfig?.[stage]?.type === "Video" && (
-                    <>
-                      <label className="ra-field-label">Seleccionar video</label>
-                      <input
-                        className="ra-field"
-                        type="file"
-                        accept="video/*"
-                        onChange={(e) =>
-                          handleARStageFileChange(stage, "videoUrl", e.target.files?.[0] ?? null)
-                        }
-                      />
-                    </>
+          {arSelectedStages?.[activeARTab] ? (
+            <div className="ar-content-cards">
+              <div className={`ar-content-card ${arConfig?.[activeARTab]?.text?.trim() ? "has-content" : ""}`}>
+                <div className="ar-card-header">
+                  <span className="ar-card-icon">TXT</span>
+                  <span className="ar-card-title">Texto</span>
+                  {arConfig?.[activeARTab]?.text?.trim() && (
+                    <button
+                      className="ar-delete-btn"
+                      onClick={() => setARStageField(activeARTab, "text", "")}
+                      title="Eliminar texto"
+                    >
+                      x
+                    </button>
                   )}
                 </div>
-              )}
+                <div className="ar-card-body">
+                  <textarea
+                    className="ra-field"
+                    value={arConfig?.[activeARTab]?.text ?? ""}
+                    onChange={(e) => setARStageField(activeARTab, "text", e.target.value)}
+                    rows={3}
+                    placeholder="Escribe el mensaje de texto..."
+                  />
+                </div>
+              </div>
+
+              <div className={`ar-content-card ${arConfig?.[activeARTab]?.imageUrl?.trim() ? "has-content" : ""}`}>
+                <div className="ar-card-header">
+                  <span className="ar-card-icon">IMG</span>
+                  <span className="ar-card-title">Imagen</span>
+                  {arConfig?.[activeARTab]?.imageUrl?.trim() && (
+                    <button
+                      className="ar-delete-btn"
+                      onClick={() => handleARStageFileChange(activeARTab, "imageUrl", null)}
+                      title="Eliminar imagen"
+                    >
+                      x
+                    </button>
+                  )}
+                </div>
+                <div className="ar-card-body">
+                  <input
+                    className="ra-field"
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) =>
+                      handleARStageFileChange(
+                        activeARTab,
+                        "imageUrl",
+                        e.target.files?.[0] ?? null
+                      )
+                    }
+                  />
+                  {arConfig?.[activeARTab]?.imageUrl && (
+                    <img
+                      src={arConfig[activeARTab].imageUrl}
+                      alt="Preview"
+                      className="ar-preview-image"
+                    />
+                  )}
+                </div>
+              </div>
+
+              <div className={`ar-content-card ${arConfig?.[activeARTab]?.audioUrl?.trim() ? "has-content" : ""}`}>
+                <div className="ar-card-header">
+                  <span className="ar-card-icon">AUD</span>
+                  <span className="ar-card-title">Audio</span>
+                  {arConfig?.[activeARTab]?.audioUrl?.trim() && (
+                    <button
+                      className="ar-delete-btn"
+                      onClick={() => handleARStageFileChange(activeARTab, "audioUrl", null)}
+                      title="Eliminar audio"
+                    >
+                      x
+                    </button>
+                  )}
+                </div>
+                <div className="ar-card-body">
+                  <input
+                    className="ra-field"
+                    type="file"
+                    accept="audio/*"
+                    onChange={(e) =>
+                      handleARStageFileChange(
+                        activeARTab,
+                        "audioUrl",
+                        e.target.files?.[0] ?? null
+                      )
+                    }
+                  />
+                  {arConfig?.[activeARTab]?.audioUrl && (
+                    <audio
+                      controls
+                      src={arConfig[activeARTab].audioUrl}
+                      className="ar-preview-audio"
+                    />
+                  )}
+                </div>
+              </div>
+
+              <div className={`ar-content-card ${arConfig?.[activeARTab]?.videoUrl?.trim() ? "has-content" : ""}`}>
+                <div className="ar-card-header">
+                  <span className="ar-card-icon">VID</span>
+                  <span className="ar-card-title">Video</span>
+                  {arConfig?.[activeARTab]?.videoUrl?.trim() && (
+                    <button
+                      className="ar-delete-btn"
+                      onClick={() => handleARStageFileChange(activeARTab, "videoUrl", null)}
+                      title="Eliminar video"
+                    >
+                      x
+                    </button>
+                  )}
+                </div>
+                <div className="ar-card-body">
+                  <input
+                    className="ra-field"
+                    type="file"
+                    accept="video/*"
+                    onChange={(e) =>
+                      handleARStageFileChange(
+                        activeARTab,
+                        "videoUrl",
+                        e.target.files?.[0] ?? null
+                      )
+                    }
+                  />
+                  {arConfig?.[activeARTab]?.videoUrl && (
+                    <video
+                      controls
+                      src={arConfig[activeARTab].videoUrl}
+                      className="ar-preview-video"
+                    />
+                  )}
+                </div>
+              </div>
             </div>
-          ))}
+          ) : (
+            <div className="ar-disabled-message">
+              <p>Habilita esta etapa para configurar el contenido de Realidad Aumentada.</p>
+            </div>
+          )}
         </div>
 
         <button
           className="ra-save-btn"
           onClick={saveARConfigAndContinue}
         >
-          Guardar y continuar →
+          Guardar y continuar
         </button>
       </div>
     </div>
