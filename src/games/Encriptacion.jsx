@@ -20,7 +20,6 @@ const LS = {
 };
 
 const AR_STAGES = ["Inicio", "Acierto", "Final"];
-const AR_TYPES = ["Texto", "Imagen", "Audio", "Video"];
 
 const readJSON = (key, fallback) => {
   try {
@@ -881,18 +880,51 @@ export default function Encriptacion() {
   // 7.2) Estado del wizard
   const [setupStep, setSetupStep] = useState("ar");
 
+  // Pestaña activa en la configuración de RA
+  const [activeARTab, setActiveARTab] = useState("Inicio");
+
   // 7.3) Estado RA
   const [arSelectedStages, setArSelectedStages] = useState(() =>
     readJSON(LS.arStages, { Inicio: false, Acierto: false, Final: false })
   );
 
+  // Nueva estructura: cada etapa puede tener los 4 tipos de contenido
   const [arConfig, setArConfig] = useState(() =>
-    readJSON(LS.arConfig, {
-      Inicio: { type: "Texto", text: "" },
-      Acierto: { type: "Texto", text: "" },
-      Final: { type: "Texto", text: "" },
-    })
+    readJSON(LS.arConfig, {})
   );
+
+  // Normaliza la configuración de una etapa
+  const normalizeStageConfig = (stageCfg = {}) => {
+    const text = stageCfg.text ?? "";
+    const imageUrl = stageCfg.imageUrl ?? "";
+    const audioUrl = stageCfg.audioUrl ?? "";
+    const videoUrl = stageCfg.videoUrl ?? "";
+
+    let detectedType = stageCfg.type;
+    if (!detectedType) {
+      if (videoUrl?.trim()) detectedType = "Video";
+      else if (imageUrl?.trim()) detectedType = "Imagen";
+      else if (audioUrl?.trim()) detectedType = "Audio";
+      else if (text?.trim()) detectedType = "Texto";
+    }
+
+    return {
+      type: detectedType,
+      text,
+      imageUrl,
+      audioUrl,
+      videoUrl,
+      hasText: !!text?.trim(),
+      hasImage: !!imageUrl?.trim(),
+      hasAudio: !!audioUrl?.trim(),
+      hasVideo: !!videoUrl?.trim(),
+    };
+  };
+
+  const hasStageContent = (stageCfg = {}) => {
+    const cfg = normalizeStageConfig(stageCfg);
+    return !!(cfg.text?.trim() || cfg.imageUrl?.trim() || cfg.audioUrl?.trim() || cfg.videoUrl?.trim());
+  };
 
   // Nota: los ObjectURL no sobreviven a un refresh. Si necesitas persistencia real,
   // conviene base64 o subir a servidor.
@@ -990,13 +1022,6 @@ export default function Encriptacion() {
     setArSelectedStages((prev) => ({ ...prev, [stage]: !prev[stage] }));
   };
 
-  const setARStageType = (stage, type) => {
-    setArConfig((prev) => ({
-      ...prev,
-      [stage]: { ...(prev[stage] ?? {}), type },
-    }));
-  };
-
   const setARStageField = (stage, field, value) => {
     setArConfig((prev) => ({
       ...prev,
@@ -1030,21 +1055,16 @@ export default function Encriptacion() {
       return { ok: false, msg: "Selecciona al menos una etapa de RA (Inicio/Acierto/Final)." };
     }
 
+    // Verificar que cada etapa habilitada tenga al menos un contenido
     for (const stage of enabledStages) {
       const cfg = arConfig?.[stage] ?? {};
-      if (!cfg.type) return { ok: false, msg: `Selecciona un tipo para la etapa “${stage}”.` };
+      const hasText = !!cfg.text?.trim();
+      const hasImage = !!cfg.imageUrl?.trim();
+      const hasAudio = !!cfg.audioUrl?.trim();
+      const hasVideo = !!cfg.videoUrl?.trim();
 
-      if (cfg.type === "Texto" && !cfg.text?.trim()) {
-        return { ok: false, msg: `Escribe un texto para la etapa “${stage}”.` };
-      }
-      if (cfg.type === "Imagen" && !cfg.imageUrl?.trim()) {
-        return { ok: false, msg: `Selecciona una imagen para la etapa “${stage}”.` };
-      }
-      if (cfg.type === "Audio" && !cfg.audioUrl?.trim()) {
-        return { ok: false, msg: `Selecciona un audio para la etapa “${stage}”.` };
-      }
-      if (cfg.type === "Video" && !cfg.videoUrl?.trim()) {
-        return { ok: false, msg: `Selecciona un video para la etapa “${stage}”.` };
+      if (!hasText && !hasImage && !hasAudio && !hasVideo) {
+        return { ok: false, msg: `Agrega al menos un contenido para la etapa "${stage}".` };
       }
     }
 
@@ -1057,28 +1077,49 @@ export default function Encriptacion() {
 
     // 2) Solo si hay contenido real
     const stageCfg = arConfig?.[stage] ?? {};
-    const hasContent = (() => {
-      if (stageCfg.type === "Texto") return !!stageCfg.text?.trim();
-      if (stageCfg.type === "Imagen") return !!stageCfg.imageUrl?.trim();
-      if (stageCfg.type === "Audio") return !!stageCfg.audioUrl?.trim();
-      if (stageCfg.type === "Video") return !!stageCfg.videoUrl?.trim();
-      return false;
-    })();
-    if (!hasContent) return true;
+    if (!hasStageContent(stageCfg)) return true;
     if (!ensureSwal()) return false;
 
-    const containerId = `ra-three-${stage}-${Date.now()}`;
-    const bgId = `enc-ar-bg-${stage}-${Date.now()}`;
-    const videoId = `enc-ar-video-${stage}-${Date.now()}`;
+    const cfg = normalizeStageConfig(stageCfg);
+    const timestamp = Date.now();
+    const bgId = `enc-ar-bg-${stage}-${timestamp}`;
+    const videoId = `enc-ar-video-${stage}-${timestamp}`;
     const useCamera = stage === 'Acierto';
 
-    let cleanupThree;
+    const ids = {
+      textContainerId: `ar-text-${timestamp}`,
+      imageContainerId: `ar-image-${timestamp}`,
+      videoContainerId: `ar-video-${timestamp}`,
+      audioId: `ar-audio-${timestamp}`,
+    };
+
+    const cleanups = [];
     let cleanupSymbols;
     let cameraStream;
 
+    // Construir HTML para múltiples contenidos
+    const buildMultiContentHtml = () => {
+      const parts = [];
+      if (cfg.hasText) {
+        parts.push(`<div class="enc-ar-content-item"><div id="${ids.textContainerId}" class="ra-three-canvas"></div></div>`);
+      }
+      if (cfg.hasImage) {
+        parts.push(`<div class="enc-ar-content-item"><div id="${ids.imageContainerId}" class="ra-three-canvas"></div></div>`);
+      }
+      if (cfg.hasVideo) {
+        parts.push(`<div class="enc-ar-content-item"><div id="${ids.videoContainerId}" class="ra-three-canvas"></div></div>`);
+      }
+      if (cfg.hasAudio && !cfg.hasText && !cfg.hasImage && !cfg.hasVideo) {
+        parts.push(`<div class="enc-ar-audio-solo"><audio id="${ids.audioId}" controls src="${escapeHtml(cfg.audioUrl)}" class="ar-audio-player"></audio></div>`);
+      } else if (cfg.hasAudio) {
+        parts.push(`<audio id="${ids.audioId}" autoplay src="${escapeHtml(cfg.audioUrl)}" style="display:none;"></audio>`);
+      }
+      return parts.join('');
+    };
+
     const html = buildDecoratedHtml({
       bgId,
-      innerHtml: `<div class="enc-ar-three-wrap"><div id="${containerId}" class="ra-three-canvas"></div></div>`,
+      innerHtml: `<div class="enc-ar-multi-content">${buildMultiContentHtml()}</div>`,
       useCamera,
       videoId,
     });
@@ -1096,11 +1137,22 @@ export default function Encriptacion() {
         const bgEl = document.getElementById(bgId);
         cleanupSymbols = createFloatingSymbols(bgEl);
 
-        const container = document.getElementById(containerId);
-        if (container) cleanupThree = initThreeStage(container, stageCfg);
+        // Inicializar Three.js para cada tipo de contenido
+        if (cfg.hasText) {
+          const container = document.getElementById(ids.textContainerId);
+          if (container) cleanups.push(initThreeStage(container, { type: "Texto", text: cfg.text }));
+        }
+        if (cfg.hasImage) {
+          const container = document.getElementById(ids.imageContainerId);
+          if (container) cleanups.push(initThreeStage(container, { type: "Imagen", imageUrl: cfg.imageUrl }));
+        }
+        if (cfg.hasVideo) {
+          const container = document.getElementById(ids.videoContainerId);
+          if (container) cleanups.push(initThreeStage(container, { type: "Video", videoUrl: cfg.videoUrl }));
+        }
       },
       willClose: () => {
-        if (cleanupThree) cleanupThree();
+        cleanups.forEach(cleanup => cleanup && cleanup());
         if (cleanupSymbols) cleanupSymbols();
         if (cameraStream) stopCamera(cameraStream);
       },
@@ -1123,32 +1175,25 @@ export default function Encriptacion() {
     let body = `<p class="ra-empty">No habilitada.</p>`;
 
     if (isEnabled) {
-      const type = stageCfg?.type;
-      if (!type) {
-        body = `<p class="ra-empty">Sin tipo configurado.</p>`;
-      } else if (type === "Texto") {
-        const text = stageCfg.text?.trim();
-        body = text
-          ? `<p class="ra-text">${escapeHtml(text)}</p>`
-          : `<p class="ra-empty">Texto vacío.</p>`;
-      } else if (type === "Imagen") {
-        const src = stageCfg.imageUrl?.trim();
-        body = src
-          ? `<img class="ra-media" src="${escapeHtml(src)}" alt="RA ${escapeHtml(stage)}" />`
-          : `<p class="ra-empty">Sin imagen.</p>`;
-      } else if (type === "Audio") {
-        const src = stageCfg.audioUrl?.trim();
-        body = src
-          ? `<audio class="ra-audio" controls src="${escapeHtml(src)}"></audio>`
-          : `<p class="ra-empty">Sin audio.</p>`;
-      } else if (type === "Video") {
-        const src = stageCfg.videoUrl?.trim();
-        body = src
-          ? `<video class="ra-video" controls src="${escapeHtml(src)}"></video>`
-          : `<p class="ra-empty">Sin video.</p>`;
-      } else {
-        body = `<p class="ra-empty">Tipo no soportado.</p>`;
+      const contents = [];
+
+      // Verificar cada tipo de contenido
+      if (stageCfg?.text?.trim()) {
+        contents.push(`<div class="ra-content-item"><span class="ra-icon">📝</span> Texto configurado</div>`);
       }
+      if (stageCfg?.imageUrl?.trim()) {
+        contents.push(`<div class="ra-content-item"><span class="ra-icon">🖼️</span> Imagen configurada</div>`);
+      }
+      if (stageCfg?.audioUrl?.trim()) {
+        contents.push(`<div class="ra-content-item"><span class="ra-icon">🎵</span> Audio configurado</div>`);
+      }
+      if (stageCfg?.videoUrl?.trim()) {
+        contents.push(`<div class="ra-content-item"><span class="ra-icon">🎬</span> Video configurado</div>`);
+      }
+
+      body = contents.length > 0
+        ? contents.join("")
+        : `<p class="ra-empty">Sin contenido configurado.</p>`;
     }
 
     return `
@@ -1241,6 +1286,7 @@ export default function Encriptacion() {
     setEncryptedText("");
     setAnswer("");
     setGameState("welcome");
+    setSetupStep("playing"); // Ir a pantalla de juego
   };
 
   const loadCurrentChallenge = (idx) => {
@@ -1352,67 +1398,75 @@ export default function Encriptacion() {
   // 10) UI (VISTA PREVIA)
   // =======================
 
-  const renderPreviewArea = () => {
-    if (gameState === "config") {
-      return (
-        <div className="enc-preview-placeholder">
-          Selecciona tus opciones y presiona “Vista previa” para comenzar.
-        </div>
-      );
-    }
-
+  // Renderiza la pantalla del juego (welcome o playing)
+  const renderGameScreen = () => {
     if (gameState === "welcome") {
       return (
-        <div className="enc-preview-welcome">
-          <h2>Bienvenido a Encriptación</h2>
-          <p>Descifra el mensaje escribiendo la frase original.</p>
-          <button className="enc-btn primary" onClick={handleStartGame}>
-            Iniciar juego
-          </button>
+        <div className="enc-screen">
+          <div className="enc-panel enc-game-panel">
+            <h1 className="enc-title">Encriptación</h1>
+            <div className="enc-welcome-content">
+              <h2>Bienvenido a Encriptación</h2>
+              <p>Descifra el mensaje escribiendo la frase original.</p>
+              <button className="enc-btn primary" onClick={handleStartGame}>
+                Iniciar juego
+              </button>
+              <button
+                className="enc-btn"
+                style={{ marginTop: "0.5rem", background: "var(--secondary)" }}
+                onClick={() => {
+                  setSetupStep("game");
+                  setGameState("config");
+                }}
+              >
+                Volver a configuración
+              </button>
+            </div>
+          </div>
         </div>
       );
     }
 
     // playing
     return (
-      <div className="enc-game-layout">
-        <div className="enc-game-content">
-          <div className="enc-hint">
-            <b>Nota:</b> Los espacios en el mensaje encriptado indican separación entre palabras.
+      <div className="enc-screen">
+        <div className="enc-panel enc-game-panel">
+          <h1 className="enc-title">Encriptación</h1>
+          <div className="enc-game-layout">
+            <div className="enc-game-content">
+              <div className="enc-hint">
+                <b>Nota:</b> Los espacios en el mensaje encriptado indican separación entre palabras.
+              </div>
+
+              <div className="enc-encrypted-display">{encryptedText}</div>
+
+              <div className="enc-answer-row">
+                <input
+                  className="enc-input"
+                  type="text"
+                  value={answer}
+                  onChange={(e) => setAnswer(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && answer.trim()) handleVerify();
+                  }}
+                  placeholder="Escribe tu respuesta aquí..."
+                  autoFocus
+                />
+                <button className="enc-btn success" disabled={!answer.trim()} onClick={handleVerify}>
+                  Verificar
+                </button>
+              </div>
+
+              <div className="enc-score">Puntuación: {score}</div>
+              <div className="enc-progress">
+                Ejercicio {Math.min(stepIndex + 1, pickedExercises.length)} de {pickedExercises.length}
+              </div>
+            </div>
+
+            <div className="enc-image-reference">
+              <img src="/encrip/Encriptación.jpg" alt="Tabla de cifrado" />
+            </div>
           </div>
-
-          <div className="enc-encrypted-display">{encryptedText}</div>
-
-          <div className="enc-answer-row">
-            <input
-              className="enc-input"
-              type="text"
-              value={answer}
-              onChange={(e) => setAnswer(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && answer.trim()) handleVerify();
-              }}
-              placeholder="Escribe tu respuesta aquí..."
-              autoFocus
-            />
-            <button className="enc-btn success" disabled={!answer.trim()} onClick={handleVerify}>
-              Verificar
-            </button>
-          </div>
-
-          <div className="enc-score">Puntuación: {score}</div>
-          <div className="enc-progress">
-            Ejercicio {Math.min(stepIndex + 1, pickedExercises.length)} de {pickedExercises.length}
-          </div>
-        </div>
-
-        <div className="enc-image-reference">
-          {/*
-            IMPORTANTE:
-            - Esta imagen debe existir en /public/Encriptación.jpg
-            - Si tu generador la coloca en otra ruta, ajusta el src.
-          */}
-          <img src="/encrip/Encriptación.jpg" alt="Tabla de cifrado" />
         </div>
       </div>
     );
@@ -1438,13 +1492,12 @@ export default function Encriptacion() {
           --font-family: 'Poppins', sans-serif;
         }
 
-        .enc-layout {
+        .enc-screen {
           display: flex;
-          gap: 2rem;
+          justify-content: center;
+          align-items: flex-start;
           width: 100%;
-          max-width: 1200px;
-          margin: 0 auto;
-          padding: 1rem;
+          box-sizing: border-box;
         }
 
         .enc-panel {
@@ -1452,18 +1505,36 @@ export default function Encriptacion() {
           border-radius: 16px;
           box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
           padding: 2rem;
+          width: 100%;
         }
 
-        .enc-config {
-          flex: 1;
-          min-width: 320px;
+        .enc-single-panel {
+          width: 100%;
         }
 
-        .enc-preview {
-          flex: 2;
+        .enc-game-panel {
+          width: 100%;
+          max-width: 900px;
+        }
+
+        .enc-welcome-content {
           display: flex;
           flex-direction: column;
-          gap: 1rem;
+          align-items: center;
+          justify-content: center;
+          min-height: 300px;
+          text-align: center;
+          padding: 2rem;
+        }
+
+        .enc-welcome-content h2 {
+          margin-bottom: 0.5rem;
+          color: var(--primary);
+        }
+
+        .enc-welcome-content p {
+          margin-bottom: 2rem;
+          color: var(--secondary);
         }
 
         .enc-title {
@@ -1579,44 +1650,6 @@ export default function Encriptacion() {
         }
         .ra-preview-btn:hover { background-color: rgba(0, 119, 182, 0.18); }
 
-        /* Preview panel */
-        .enc-preview h2 { margin: 0; color: var(--primary); }
-
-        .enc-preview-placeholder {
-          display: grid;
-          place-items: center;
-          height: 100%;
-          min-height: 360px;
-          color: var(--secondary);
-          text-align: center;
-          border: 2px dashed var(--primary);
-          border-radius: 12px;
-          background-color: var(--light);
-        }
-
-        .enc-preview-welcome {
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          align-items: center;
-          min-height: 360px;
-          text-align: center;
-          background-color: var(--light);
-          border: 2px dashed var(--primary);
-          border-radius: 12px;
-          padding: 2rem;
-        }
-
-        .enc-preview-welcome h2 {
-          margin-bottom: 0.5rem;
-          color: var(--primary);
-        }
-
-        .enc-preview-welcome p {
-          margin-bottom: 2rem;
-          color: var(--secondary);
-        }
-
         .enc-game-layout {
           display: flex;
           gap: 1.6rem;
@@ -1708,8 +1741,6 @@ export default function Encriptacion() {
         }
 
         @media (max-width: 980px) {
-          .enc-layout { flex-direction: column; }
-          .enc-config, .enc-preview { width: 100%; }
           .enc-image-reference { flex: 1 1 auto; }
           .enc-game-layout { flex-direction: column; }
         }
@@ -1757,15 +1788,12 @@ export default function Encriptacion() {
           height: 100%;
           object-fit: cover;
           z-index: 0;
-          border-radius: 28px;
+          border-radius: 28px;;
         }
 
         .enc-ar-bg-elements {
           position: absolute;
           inset: 0;
-          background:
-            radial-gradient(circle at 20% 20%, rgba(255,255,255,0.1) 0%, transparent 50%),
-            radial-gradient(circle at 80% 80%, rgba(255,255,255,0.1) 0%, transparent 50%);
           pointer-events: none;
         }
 
@@ -1786,7 +1814,6 @@ export default function Encriptacion() {
           font-weight: 800;
           text-shadow: 2px 2px 8px #3a0ca3, 0 0 20px rgba(0,0,0,0.8);
           text-align: center;
-          background: rgba(0, 0, 0, 0.4);
           padding: 0.8rem 1.5rem;
           border-radius: 12px;
           backdrop-filter: blur(5px);
@@ -1812,171 +1839,432 @@ export default function Encriptacion() {
         .ra-three-canvas {
           width: 100%;
           height: 100%;
+          background: transparent;
+        }
+
+        /* ======================= */
+        /* AR Tabs y Tarjetas      */
+        /* ======================= */
+
+        .ar-tabs {
+          display: flex;
+          gap: 0;
+          margin-bottom: 1.5rem;
+          border-bottom: 2px solid #e9ecef;
+        }
+
+        .ar-tab {
+          flex: 1;
+          padding: 1rem 1.5rem;
+          border: none;
+          background: transparent;
+          cursor: pointer;
+          font-size: 1rem;
+          font-weight: 600;
+          color: var(--secondary);
+          transition: all 0.2s ease;
+          position: relative;
+          font-family: 'Poppins', sans-serif;
+        }
+
+        .ar-tab:hover {
+          color: var(--primary);
+          background: rgba(0, 123, 255, 0.05);
+        }
+
+        .ar-tab.active {
+          color: var(--primary);
+        }
+
+        .ar-tab.active::after {
+          content: '';
+          position: absolute;
+          bottom: -2px;
+          left: 0;
+          right: 0;
+          height: 3px;
+          background: var(--primary);
+          border-radius: 3px 3px 0 0;
+        }
+
+        .ar-tab-check {
+          display: inline-block;
+          margin-left: 0.4rem;
+          color: var(--success);
+          font-size: 0.9rem;
+        }
+
+        .ar-tab.enabled .ar-tab-check {
+          color: var(--success);
+        }
+
+        .ar-tab-content {
+          padding: 1.5rem;
+          background: transparent;
+          border-radius: 12px;
+          margin-bottom: 1rem;
+        }
+
+        .ar-stage-toggle-row {
+          margin-bottom: 1rem;
+          padding-bottom: 1rem;
+          border-bottom: 1px solid #e9ecef;
+        }
+
+        .ar-content-cards {
+          display: grid;
+          width: 100%;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 1rem;
+        }
+
+        .ar-content-card {
+          width: 100%;
+          background: white;
+          border: 2px solid #e9ecef;
+          border-radius: 12px;
+          padding: 1rem;
+          transition: all 0.2s ease;
+        }
+
+        .ar-content-card:hover {
+          border-color: var(--primary);
+          box-shadow: 0 4px 12px rgba(0, 123, 255, 0.1);
+        }
+
+        .ar-content-card.has-content {
+          border-color: var(--success);
+          background: linear-gradient(135deg, rgba(40, 167, 69, 0.05), white);
+        }
+
+        .ar-card-header {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          margin-bottom: 0.75rem;
+          padding-bottom: 0.5rem;
+          border-bottom: 1px solid #e9ecef;
+        }
+
+        .ar-card-icon {
+          font-size: 1.5rem;
+        }
+
+        .ar-card-title {
+          font-weight: 600;
+          color: var(--dark);
+          font-size: 1rem;
+          flex: 1;
+        }
+
+        .ar-delete-btn {
+          background: #ff4757;
+          color: white;
+          border: none;
+          width: 24px;
+          height: 24px;
+          border-radius: 50%;
+          cursor: pointer;
+          font-size: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s ease;
+          flex-shrink: 0;
+        }
+
+        .ar-delete-btn:hover {
+          background: #ff6b7a;
+          transform: scale(1.1);
+        }
+
+        .ar-card-body {
+          display: flex;
+          flex-direction: column;
+          gap: 0.75rem;
+        }
+
+        .ar-preview-image {
+          max-width: 100%;
+          max-height: 100px;
+          object-fit: contain;
+          border-radius: 8px;
+          margin-top: 0.5rem;
+        }
+
+        .ar-preview-audio {
+          width: 100%;
+          margin-top: 0.5rem;
+        }
+
+        .ar-preview-video {
+          width: 100%;
+          max-height: 100px;
+          border-radius: 8px;
+          margin-top: 0.5rem;
+        }
+
+        .ar-disabled-message {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 150px;
+          background: #f8f9fa;
+          border-radius: 12px;
+          color: var(--secondary);
+        }
+
+        .ar-disabled-message p {
+          font-size: 1rem;
+          margin: 0;
+          text-align: center;
+        }
+
+        @media (max-width: 600px) {
+          .ar-content-cards {
+            grid-template-columns: 1fr;
+          }
         }
       `}</style>
 
-      <div className="enc-layout">
-        <div className="enc-panel enc-config">
-          <h1 className="enc-title">Encriptación</h1>
+      {/* PANTALLA 1: Configuración de RA */}
+      {setupStep === "ar" && (
+        <div className="enc-screen">
+          <div className="enc-panel enc-single-panel">
+            <h1 className="enc-title">Encriptación</h1>
+            <h2 style={{ margin: 0, color: "var(--primary)", textAlign: "center" }}>
+              Configuración de RA
+            </h2>
 
-          {setupStep === "ar" ? (
-            <>
-              <h2 style={{ margin: 0, color: "var(--primary)", textAlign: "center" }}>
-                Configuración de RA
-              </h2>
+            {/* Pestañas de etapas */}
+            <div className="ar-tabs">
+              {AR_STAGES.map((stage) => (
+                <button
+                  key={stage}
+                  className={`ar-tab ${activeARTab === stage ? "active" : ""} ${arSelectedStages?.[stage] ? "enabled" : ""}`}
+                  onClick={() => setActiveARTab(stage)}
+                >
+                  {stage}
+                  {arSelectedStages?.[stage] && <span className="ar-tab-check">✓</span>}
+                </button>
+              ))}
+            </div>
 
-              <div className="enc-section">
-                <span className="enc-label">Etapas a habilitar:</span>
-                <div className="ra-stage-list">
-                  {AR_STAGES.map((stage) => (
-                    <div
-                      key={stage}
-                      className={`ra-stage-card ${arSelectedStages?.[stage] ? "is-active" : ""}`}
-                    >
-                      <label className="ra-stage-toggle">
-                        <input
-                          type="checkbox"
-                          checked={!!arSelectedStages?.[stage]}
-                          onChange={() => toggleARStage(stage)}
-                        />
-                        <span>{stage}</span>
-                      </label>
+            {/* Contenido de la pestaña activa */}
+            <div className="ar-tab-content">
+              <div className="ar-stage-toggle-row">
+                <label className="ra-stage-toggle">
+                  <input
+                    type="checkbox"
+                    checked={!!arSelectedStages?.[activeARTab]}
+                    onChange={() => toggleARStage(activeARTab)}
+                  />
+                  <span>Habilitar etapa {activeARTab}</span>
+                </label>
+              </div>
 
-                      {arSelectedStages?.[stage] && (
-                        <div className="ra-stage-body">
-                          <label className="ra-field-label">Tipo de contenido:</label>
-                          <select
-                            className="enc-field"
-                            value={arConfig?.[stage]?.type ?? "Texto"}
-                            onChange={(e) => setARStageType(stage, e.target.value)}
-                          >
-                            {AR_TYPES.map((t) => (
-                              <option key={t} value={t}>
-                                {t}
-                              </option>
-                            ))}
-                          </select>
-                          {(arConfig?.[stage]?.type === "Texto") && (
-                            <>
-                              <label className="ra-field-label">Texto (máx. 20):</label>
-                              <textarea
-                                className="enc-field"
-                                rows={3}
-                                value={arConfig?.[stage]?.text ?? ""}
-                                onChange={(e) => setARStageField(stage, "text", e.target.value.slice(0, 20))}
-                                placeholder="Escribe el mensaje..."
-                              />
-                            </>
-                          )}
-
-                          {arConfig?.[stage]?.type === "Imagen" && (
-                            <>
-                              <label className="ra-field-label">Archivo de imagen:</label>
-                              <input
-                                className="enc-field"
-                                type="file"
-                                accept="image/*"
-                                onChange={(e) =>
-                                  handleARStageFileChange(stage, "imageUrl", e.target.files?.[0] ?? null)
-                                }
-                              />
-                            </>
-                          )}
-
-                          {arConfig?.[stage]?.type === "Audio" && (
-                            <>
-                              <label className="ra-field-label">Archivo de audio:</label>
-                              <input
-                                className="enc-field"
-                                type="file"
-                                accept="audio/*"
-                                onChange={(e) =>
-                                  handleARStageFileChange(stage, "audioUrl", e.target.files?.[0] ?? null)
-                                }
-                              />
-                            </>
-                          )}
-
-                          {arConfig?.[stage]?.type === "Video" && (
-                            <>
-                              <label className="ra-field-label">Archivo de video:</label>
-                              <input
-                                className="enc-field"
-                                type="file"
-                                accept="video/*"
-                                onChange={(e) =>
-                                  handleARStageFileChange(stage, "videoUrl", e.target.files?.[0] ?? null)
-                                }
-                              />
-                            </>
-                          )}
-                        </div>
+              {arSelectedStages[activeARTab] && (
+                <div className="ar-content-cards">
+                  {/* Tarjeta de Texto */}
+                  <div className={`ar-content-card ${arConfig?.[activeARTab]?.text?.trim() ? "has-content" : ""}`}>
+                    <div className="ar-card-header">
+                      <span className="ar-card-icon">📝</span>
+                      <span className="ar-card-title">Texto</span>
+                      {arConfig?.[activeARTab]?.text?.trim() && (
+                        <button
+                          className="ar-delete-btn"
+                          onClick={() => setARStageField(activeARTab, "text", "")}
+                          title="Eliminar texto"
+                        >
+                          ✕
+                        </button>
                       )}
                     </div>
-                  ))}
+                    <div className="ar-card-body">
+                      <textarea
+                        className="enc-field"
+                        value={arConfig?.[activeARTab]?.text ?? ""}
+                        onChange={(e) => setARStageField(activeARTab, "text", e.target.value)}
+                        rows={3}
+                        placeholder="Escribe el mensaje de texto..."
+                      />
+                    </div>
+                  </div>
+
+                  {/* Tarjeta de Imagen */}
+                  <div className={`ar-content-card ${arConfig?.[activeARTab]?.imageUrl?.trim() ? "has-content" : ""}`}>
+                    <div className="ar-card-header">
+                      <span className="ar-card-icon">🖼️</span>
+                      <span className="ar-card-title">Imagen</span>
+                      {arConfig?.[activeARTab]?.imageUrl?.trim() && (
+                        <button
+                          className="ar-delete-btn"
+                          onClick={() => handleARStageFileChange(activeARTab, "imageUrl", null)}
+                          title="Eliminar imagen"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                    <div className="ar-card-body">
+                      <input
+                        className="enc-field"
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) =>
+                          handleARStageFileChange(activeARTab, "imageUrl", e.target.files?.[0] ?? null)
+                        }
+                      />
+                      {arConfig?.[activeARTab]?.imageUrl && (
+                        <img
+                          src={arConfig[activeARTab].imageUrl}
+                          alt="Preview"
+                          className="ar-preview-image"
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Tarjeta de Audio */}
+                  <div className={`ar-content-card ${arConfig?.[activeARTab]?.audioUrl?.trim() ? "has-content" : ""}`}>
+                    <div className="ar-card-header">
+                      <span className="ar-card-icon">🎵</span>
+                      <span className="ar-card-title">Audio</span>
+                      {arConfig?.[activeARTab]?.audioUrl?.trim() && (
+                        <button
+                          className="ar-delete-btn"
+                          onClick={() => handleARStageFileChange(activeARTab, "audioUrl", null)}
+                          title="Eliminar audio"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                    <div className="ar-card-body">
+                      <input
+                        className="enc-field"
+                        type="file"
+                        accept="audio/*"
+                        onChange={(e) =>
+                          handleARStageFileChange(activeARTab, "audioUrl", e.target.files?.[0] ?? null)
+                        }
+                      />
+                      {arConfig?.[activeARTab]?.audioUrl && (
+                        <audio
+                          controls
+                          src={arConfig[activeARTab].audioUrl}
+                          className="ar-preview-audio"
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Tarjeta de Video */}
+                  <div className={`ar-content-card ${arConfig?.[activeARTab]?.videoUrl?.trim() ? "has-content" : ""}`}>
+                    <div className="ar-card-header">
+                      <span className="ar-card-icon">🎬</span>
+                      <span className="ar-card-title">Video</span>
+                      {arConfig?.[activeARTab]?.videoUrl?.trim() && (
+                        <button
+                          className="ar-delete-btn"
+                          onClick={() => handleARStageFileChange(activeARTab, "videoUrl", null)}
+                          title="Eliminar video"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                    <div className="ar-card-body">
+                      <input
+                        className="enc-field"
+                        type="file"
+                        accept="video/*"
+                        onChange={(e) =>
+                          handleARStageFileChange(activeARTab, "videoUrl", e.target.files?.[0] ?? null)
+                        }
+                      />
+                      {arConfig?.[activeARTab]?.videoUrl && (
+                        <video
+                          controls
+                          src={arConfig[activeARTab].videoUrl}
+                          className="ar-preview-video"
+                        />
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
 
-              <button className="enc-btn primary" onClick={saveARConfigAndContinue}>
-                Guardar RA y continuar
+              {!arSelectedStages[activeARTab] && (
+                <div className="ar-disabled-message">
+                  <p>Habilita esta etapa para configurar el contenido de Realidad Aumentada.</p>
+                </div>
+              )}
+            </div>
+
+            <button className="enc-btn primary" onClick={saveARConfigAndContinue}>
+              Continuar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* PANTALLA 2: Configuración del juego */}
+      {setupStep === "game" && (
+        <div className="enc-screen">
+          <div className="enc-panel enc-single-panel">
+            <h1 className="enc-title">Encriptación</h1>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h2 style={{ margin: 0, color: "var(--primary)" }}>Configuración del juego</h2>
+              <button
+                className="ra-preview-btn"
+                onClick={() => setSetupStep("ar")}
+                title="Editar configuración de RA"
+              >
+                Editar RA
               </button>
-            </>
-          ) : (
-            <>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <h2 style={{ margin: 0, color: "var(--primary)" }}>Configuración del juego</h2>
-                <button
-                  className="ra-preview-btn"
-                  onClick={() => setSetupStep("ar")}
-                  title="Editar configuración de RA"
-                >
-                  Editar RA
-                </button>
-              </div>
+            </div>
 
-              <div className="enc-section">
-                <label className="enc-label">Selecciona nivel:</label>
-                <select
-                  className="enc-field"
-                  value={gameConfig.level}
-                  onChange={(e) => setGameConfig((prev) => ({ ...prev, level: e.target.value }))}
-                >
-                  <option value="basico">Básico</option>
-                  <option value="intermedio">Intermedio</option>
-                  <option value="avanzado">Avanzado</option>
-                </select>
+            <div className="enc-section">
+              <label className="enc-label">Selecciona nivel:</label>
+              <select
+                className="enc-field"
+                value={gameConfig.level}
+                onChange={(e) => setGameConfig((prev) => ({ ...prev, level: e.target.value }))}
+              >
+                <option value="basico">Básico</option>
+                <option value="intermedio">Intermedio</option>
+                <option value="avanzado">Avanzado</option>
+              </select>
 
-                <label className="enc-label" style={{ marginTop: "0.8rem" }}>
-                  Número de ejercicios (disponibles: {availableCount || 0}):
-                </label>
-                <input
-                  className="enc-field"
-                  type="number"
-                  min={1}
-                  max={Math.max(1, availableCount || 1)}
-                  value={gameConfig.exerciseCount}
-                  onChange={(e) =>
-                    setGameConfig((prev) => ({
-                      ...prev,
-                      exerciseCount: Math.max(1, Math.min(availableCount || 1, Number(e.target.value) || 1)),
-                    }))
-                  }
-                  disabled={availableCount === 0}
-                />
+              <label className="enc-label" style={{ marginTop: "0.8rem" }}>
+                Número de ejercicios (disponibles: {availableCount || 0}):
+              </label>
+              <input
+                className="enc-field"
+                type="number"
+                min={1}
+                max={Math.max(1, availableCount || 1)}
+                value={gameConfig.exerciseCount}
+                onChange={(e) =>
+                  setGameConfig((prev) => ({
+                    ...prev,
+                    exerciseCount: Math.max(1, Math.min(availableCount || 1, Number(e.target.value) || 1)),
+                  }))
+                }
+                disabled={availableCount === 0}
+              />
 
-                <button className="enc-btn" onClick={prepareRun} disabled={availableCount === 0}>
-                  Vista previa
-                </button>
-              </div>
-            </>
-          )}
+              <button className="enc-btn primary" onClick={prepareRun} disabled={availableCount === 0}>
+                Iniciar juego
+              </button>
+            </div>
+          </div>
         </div>
+      )}
 
-        <div className="enc-panel enc-preview">
-          <h2>Vista previa</h2>
-          {renderPreviewArea()}
-        </div>
-      </div>
+      {/* PANTALLA 3: El juego */}
+      {setupStep === "playing" && renderGameScreen()}
     </>
   );
 }
