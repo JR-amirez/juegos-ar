@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { GrLinkNext } from "react-icons/gr";
 
-// --- DATOS DE EJERCICIOS (Integrados en el archivo) ---
 const exerciseData = [
     {
         "nivel": "basico",
@@ -69,8 +68,7 @@ const exerciseData = [
     }
 ];
 
-// --- CONFIGURACIÓN RA (namespaced) ---
-const STORAGE_NS = "cm"; // Calculadora Mental (namespace)
+const STORAGE_NS = "cm";
 const lsKey = (k) => `${STORAGE_NS}:${k}`;
 
 const LS_KEYS = {
@@ -115,14 +113,12 @@ const IconConfigure = () => (
 
 const CalculoMental = () => {
 
-    // Dentro del componente
     const STORAGE_NS = 'ar:calculoMental';
     const LS = {
         stages: `${STORAGE_NS}:selectedStages`,
         config: `${STORAGE_NS}:config`,
     };
 
-    // Helper: lee JSON con fallback a claves antiguas (para no romper lo ya guardado)
     const readJson = (key, legacyKey, fallback) => {
         try {
             const raw = localStorage.getItem(key) ?? localStorage.getItem(legacyKey);
@@ -132,17 +128,14 @@ const CalculoMental = () => {
         }
     };
 
-    // --- WIZARD: 1) RA -> 2) Juego -> 3) Preview ---
     const [setupStep, setSetupStep] = useState("ar");
 
-    // Pestaña activa en la configuración de RA
     const [activeARTab, setActiveARTab] = useState("Inicio");
 
     const [arSelectedStages, setArSelectedStages] = useState(() =>
         readJson(LS.stages, 'selectedStages', { Inicio: false, Acierto: false, Final: false })
     );
 
-    // Nueva estructura: cada etapa puede tener los 4 tipos de contenido
     const [arConfig, setArConfig] = useState(() =>
         readJson(LS.config, 'gameConfig', {})
     );
@@ -168,20 +161,16 @@ const CalculoMental = () => {
     };
 
     const ensureThree = () => {
-        // 1) Si ya existe en global, reutilízalo
         if (window.THREE) return Promise.resolve(window.THREE);
         if (threeLoadRef.current) return threeLoadRef.current;
 
-        // 2) Preferimos ES Modules (necesario para addons como FontLoader/TextGeometry)
         threeLoadRef.current = import("https://esm.sh/three@0.160.1")
             .then((mod) => {
-                // `import()` regresa un namespace de módulo (no extensible). Lo copiamos a un objeto “normal”.
                 const THREE = { ...mod };
                 window.THREE = THREE;
                 return THREE;
             })
             .catch(() => {
-                // 3) Fallback legacy (no recomendado a largo plazo)
                 return new Promise((resolve, reject) => {
                     const script = document.createElement("script");
                     script.src = "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js";
@@ -196,7 +185,6 @@ const CalculoMental = () => {
     };
 
     const ensureThreeTextAddons = () => {
-        // Carga FontLoader y TextGeometry (addons) desde CDN (ESM)
         if (threeAddonsLoadRef.current) return threeAddonsLoadRef.current;
 
         threeAddonsLoadRef.current = ensureThree().then(async (THREE) => {
@@ -211,7 +199,6 @@ const CalculoMental = () => {
         return threeAddonsLoadRef.current;
     };
 
-    // 1) Etapas de RA
     const AR_STAGES = ['Inicio', 'Acierto', 'Final'];
 
     const toggleStage = (stage) => {
@@ -236,21 +223,17 @@ const CalculoMental = () => {
             .replaceAll("'", '&#039;');
 
     const normalizeStageConfig = (stageCfg = {}) => {
-        // Extraer valores (compatibilidad con estructura antigua y nueva)
         const text = stageCfg.text ?? stageCfg.TextoValor ?? "";
         const imageUrl = stageCfg.imageUrl ?? stageCfg.ImagenUrl ?? "";
         const audioUrl = stageCfg.audioUrl ?? stageCfg.AudioUrl ?? "";
         const videoUrl = stageCfg.videoUrl ?? stageCfg.VideoUrl ?? "";
 
-        // Detectar el tipo automáticamente basado en el contenido disponible
-        // Prioridad: Video > Imagen > Audio > Texto
         let detectedType = stageCfg.type;
         if (!detectedType) {
             if (videoUrl?.trim()) detectedType = "Video";
             else if (imageUrl?.trim()) detectedType = "Imagen";
             else if (audioUrl?.trim()) detectedType = "Audio";
             else if (text?.trim()) detectedType = "Texto";
-            // Compatibilidad con estructura legacy
             else if (stageCfg.Video) detectedType = "Video";
             else if (stageCfg.Imagen) detectedType = "Imagen";
             else if (stageCfg.Audio) detectedType = "Audio";
@@ -263,7 +246,6 @@ const CalculoMental = () => {
             imageUrl,
             audioUrl,
             videoUrl,
-            // Nuevos campos para indicar qué contenidos están disponibles
             hasText: !!text?.trim(),
             hasImage: !!imageUrl?.trim(),
             hasAudio: !!audioUrl?.trim(),
@@ -273,14 +255,11 @@ const CalculoMental = () => {
 
     const hasStageContent = (stageCfg = {}) => {
         const cfg = normalizeStageConfig(stageCfg);
-        // Ahora verifica si hay al menos un tipo de contenido
         return !!(cfg.text?.trim() || cfg.imageUrl?.trim() || cfg.audioUrl?.trim() || cfg.videoUrl?.trim());
     };
 
-    // Símbolos matemáticos (igual que script.js)
     const CM_MATH_SYMBOLS = ['×', '+', '÷', '-', '=', '1', '2', '3'];
 
-    // Crea símbolos flotantes dentro de un contenedor (y regresa cleanup para evitar fugas)
     const cmCreateFloatingSymbols = (container) => {
         if (!container) return () => { };
 
@@ -292,18 +271,16 @@ const CalculoMental = () => {
             const floating = document.createElement("div");
             floating.textContent = symbol;
 
-            // Randoms (como en script.js)
-            const size = Math.random() * 30 + 20;     // 20–50px
-            const duration = Math.random() * 5 + 5;   // 5–10s
-            const left = Math.random() * 80 + 10;     // 10–90%
-            const top = Math.random() * 80 + 10;      // 10–90%
-            const dx = Math.random() * 30 - 15;       // -15..15px
-            const dy = Math.random() * 30 - 15;       // -15..15px
-            const rot = Math.random() * 30 - 15;      // -15..15deg
+            const size = Math.random() * 30 + 20;  
+            const duration = Math.random() * 5 + 5;  
+            const left = Math.random() * 80 + 10; 
+            const top = Math.random() * 80 + 10; 
+            const dx = Math.random() * 30 - 15;    
+            const dy = Math.random() * 30 - 15;   
+            const rot = Math.random() * 30 - 15;  
 
             const animName = `cmFloat_${uid}_${index}`;
 
-            // Estilos del símbolo (posición absoluta y animación)
             floating.style.cssText = `
                 position: absolute;
                 color: rgba(255, 255, 255, 0.2);
@@ -313,7 +290,6 @@ const CalculoMental = () => {
                 top: ${top}%;
             `;
 
-            // Keyframes únicos para evitar colisiones entre modales
             const keyframes = document.createElement("style");
             keyframes.textContent = `
                 @keyframes ${animName} {
@@ -329,14 +305,12 @@ const CalculoMental = () => {
             createdNodes.push(floating);
         });
 
-        // Limpieza: elimina símbolos y keyframes al cerrar el modal
         return () => {
             createdNodes.forEach((n) => n.remove());
             createdStyles.forEach((s) => s.remove());
         };
     };
 
-    // Función para iniciar la cámara en el fondo
     const startCamera = async (videoElementId) => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
@@ -355,14 +329,12 @@ const CalculoMental = () => {
         }
     };
 
-    // Función para detener la cámara
     const stopCamera = (stream) => {
         if (stream) {
             stream.getTracks().forEach(track => track.stop());
         }
     };
 
-    // Genera el HTML del "fondo RA" (el canvas va adentro)
     const cmBuildARDecoratedHtml = ({ bgId, topHtml = "", innerHtml = "", useCamera = false, videoId = "" }) => `
         <div class="cm-ar-bg ${useCamera ? 'cm-ar-bg-camera' : ''}">
             ${useCamera ? `<video id="${videoId}" class="cm-ar-camera-bg" autoplay playsinline muted></video>` : ''}
@@ -616,11 +588,9 @@ const CalculoMental = () => {
                 };
 
                 if (cfg.type === "Texto" || cfg.type === "Texto3D") {
-                    // Texto con volumen (TextGeometry). El plano solo se usa como fallback 2D.
                     plane.visible = false;
                     planeBack.visible = false;
 
-                    // Iluminacion basica para que el volumen se lea.
                     const ambient = new THREE.AmbientLight(0xffffff, 1.2);
                     scene.add(ambient);
                     const dir = new THREE.DirectionalLight(0xffffff, 1.5);
@@ -985,7 +955,6 @@ const CalculoMental = () => {
 
         if (blocks.length > 0) return blocks.join('');
 
-        // Fallback a claves antiguas
         if (stageCfg.Texto && stageCfg.TextoValor?.trim()) {
             blocks.push(`<p style="margin:0 0 12px 0; white-space:pre-wrap;">${escapeHtml(stageCfg.TextoValor.trim())}</p>`);
         }
@@ -1008,11 +977,9 @@ const CalculoMental = () => {
         return blocks.join('');
     };
 
-    // Construye el HTML para mostrar TODOS los contenidos configurados en una etapa
     const buildMultiContentHtml = (stageCfg, ids) => {
         const cfg = normalizeStageConfig(stageCfg);
 
-        // Contar elementos visuales (sin audio)
         const visualElements = [];
         if (cfg.hasText) visualElements.push('text');
         if (cfg.hasImage) visualElements.push('image');
@@ -1020,8 +987,6 @@ const CalculoMental = () => {
 
         const visualCount = visualElements.length;
         const isAudioOnly = cfg.hasAudio && visualCount === 0;
-
-        // Construir elementos individuales
         const textHtml = cfg.hasText ? `
             <div class="ar-multi-text-3d">
                 <div id="${ids.textContainerId}" class="ar-three-container"></div>
@@ -1040,7 +1005,6 @@ const CalculoMental = () => {
             </div>
         ` : '';
 
-        // Audio: nota musical cuando está solo, reproductor oculto cuando hay otros elementos
         const audioHtml = cfg.hasAudio ? (
             isAudioOnly
                 ? `<div class="ar-audio-solo">
@@ -1052,9 +1016,6 @@ const CalculoMental = () => {
                    </div>`
         ) : '';
 
-        // === LAYOUTS SEGÚN COMBINACIÓN ===
-
-        // 1 elemento visual: centrado
         if (visualCount === 1) {
             return `
                 <div class="ar-layout-single">
@@ -1064,7 +1025,6 @@ const CalculoMental = () => {
             `;
         }
 
-        // Solo audio: nota musical centrada
         if (isAudioOnly) {
             return `
                 <div class="ar-layout-single">
@@ -1073,9 +1033,7 @@ const CalculoMental = () => {
             `;
         }
 
-        // 2 elementos visuales
         if (visualCount === 2) {
-            // Texto + Imagen: texto arriba, imagen abajo
             if (cfg.hasText && cfg.hasImage) {
                 return `
                     <div class="ar-layout-text-top">
@@ -1085,7 +1043,6 @@ const CalculoMental = () => {
                     ${audioHtml}
                 `;
             }
-            // Texto + Video: texto arriba, video abajo
             if (cfg.hasText && cfg.hasVideo) {
                 return `
                     <div class="ar-layout-text-top">
@@ -1095,7 +1052,6 @@ const CalculoMental = () => {
                     ${audioHtml}
                 `;
             }
-            // Imagen + Video: misma fila
             if (cfg.hasImage && cfg.hasVideo) {
                 return `
                     <div class="ar-layout-row">
@@ -1107,7 +1063,6 @@ const CalculoMental = () => {
             }
         }
 
-        // 3 elementos visuales: Texto + Imagen + Video
         if (visualCount === 3) {
             return `
                 <div class="ar-layout-three">
@@ -1121,11 +1076,9 @@ const CalculoMental = () => {
             `;
         }
 
-        // Fallback: apilar todo
         return `${textHtml}${imageHtml}${videoHtml}${audioHtml}`;
     };
 
-    // Inicializa Three.js para un tipo específico de contenido
     const initThreeForType = (container, type, content) => {
         let disposed = false;
         let renderer, scene, camera, frameId, videoEl;
@@ -1182,7 +1135,6 @@ const CalculoMental = () => {
             scene.add(root);
 
             if (type === "Texto") {
-                // Iluminación para texto 3D
                 const ambient = new THREE.AmbientLight(0xffffff, 1.2);
                 scene.add(ambient);
                 const dir = new THREE.DirectionalLight(0xffffff, 1.5);
@@ -1271,14 +1223,12 @@ const CalculoMental = () => {
                     const planeWidth = aspect >= 1 ? 1.8 : 1.8 * aspect;
                     const planeHeight = aspect >= 1 ? 1.8 / aspect : 1.8;
 
-                    // Plano frontal
                     const plane = new THREE.Mesh(
                         new THREE.PlaneGeometry(planeWidth, planeHeight),
                         new THREE.MeshBasicMaterial({ map: texture, transparent: true })
                     );
                     root.add(plane);
 
-                    // Plano trasero (espejado para que la imagen se vea siempre)
                     const backTexture = texture.clone();
                     backTexture.colorSpace = THREE.SRGBColorSpace;
                     backTexture.wrapS = THREE.RepeatWrapping;
@@ -1420,19 +1370,16 @@ const CalculoMental = () => {
                     opacity: 0.96,
                 });
 
-                // Iluminación
                 const ambient = new THREE.AmbientLight(0xffffff, 0.35);
                 scene.add(ambient);
                 const rim = new THREE.PointLight(0x7ffcff, 1.1);
                 rim.position.set(2.5, 2.2, 3.5);
                 scene.add(rim);
 
-                // Portal group
                 portalGroup = new THREE.Group();
                 plane.position.z = -0.06;
                 portalGroup.add(plane);
 
-                // Glow
                 const glowTexture = createGlowTexture();
                 if (glowTexture) {
                     const glowMaterial = new THREE.MeshBasicMaterial({
@@ -1446,11 +1393,9 @@ const CalculoMental = () => {
                     portalGroup.add(portalGlow);
                 }
 
-                // Marco
                 portalFrameGroup = new THREE.Group();
                 portalGroup.add(portalFrameGroup);
 
-                // Partículas
                 const particleCount = 160;
                 const positions = new Float32Array(particleCount * 3);
                 portalParticleMeta = [];
@@ -1524,10 +1469,8 @@ const CalculoMental = () => {
     };
 
     const showARStageModal = async (stage, swalOverrides = {}) => {
-        // 1) Solo si la etapa está seleccionada
         if (!arSelectedStages?.[stage]) return true;
 
-        // 2) Solo si hay contenido real
         const stageCfg = arConfig?.[stage] ?? {};
         if (!hasStageContent(stageCfg)) return true;
         if (!ensureSwal()) return false;
@@ -1551,7 +1494,6 @@ const CalculoMental = () => {
             innerHtml: `<div class="ar-multi-content">${innerHtml}</div>`,
         });
 
-        // 3) Modal tipo script.js (overlay)
         const res = await window.Swal?.fire({
             html,
             confirmButtonText: "Continuar",
@@ -1560,7 +1502,6 @@ const CalculoMental = () => {
                 const bgEl = document.getElementById(bgId);
                 cleanupSymbols = cmCreateFloatingSymbols(bgEl);
 
-                // Inicializar Three.js para texto 3D si existe
                 if (cfg.hasText) {
                     const textContainer = document.getElementById(ids.textContainerId);
                     if (textContainer) {
@@ -1568,7 +1509,6 @@ const CalculoMental = () => {
                     }
                 }
 
-                // Inicializar Three.js para imagen si existe
                 if (cfg.hasImage) {
                     const imageContainer = document.getElementById(ids.imageContainerId);
                     if (imageContainer) {
@@ -1576,7 +1516,6 @@ const CalculoMental = () => {
                     }
                 }
 
-                // Inicializar Three.js para video si existe
                 if (cfg.hasVideo) {
                     const videoContainer = document.getElementById(ids.videoContainerId);
                     if (videoContainer) {
@@ -1628,7 +1567,6 @@ const CalculoMental = () => {
             return { ok: false, msg: "Selecciona al menos una etapa de RA (Inicio/Acierto/Final)." };
         }
 
-        // Verificar que cada etapa habilitada tenga al menos un contenido
         for (const stage of enabledStages) {
             const cfg = arConfig?.[stage] ?? {};
             const hasText = !!cfg.text?.trim();
@@ -1651,7 +1589,6 @@ const CalculoMental = () => {
         if (isEnabled) {
             const contents = [];
 
-            // Verificar cada tipo de contenido
             if (stageCfg?.text?.trim()) {
                 contents.push(`<div class="ra-content-item"><span class="ra-icon">📝</span> Texto configurado</div>`);
             }
@@ -1747,8 +1684,7 @@ const CalculoMental = () => {
         }
     };
 
-    // --- ESTADOS DEL COMPONENTE ---
-    const [gameState, setGameState] = useState('config'); // config, welcome, playing, answering, finished, summary
+    const [gameState, setGameState] = useState('config');
     const [config, setConfig] = useState({ level: 'basico', exerciseCount: 1 });
     const [gameData, setGameData] = useState({ exercises: [], currentStep: 0, score: 0 });
     const [operationText, setOperationText] = useState('');
@@ -1760,21 +1696,18 @@ const CalculoMental = () => {
 
     const levels = [...new Set(exerciseData.map(ej => ej.nivel))];
 
-    // --- EFECTOS ---
     useEffect(() => {
-        // FIX: Cargar dinámicamente el script de SweetAlert2 para asegurar que las modales funcionen.
         const script = document.createElement('script');
         script.src = "https://cdn.jsdelivr.net/npm/sweetalert2@11";
         script.async = true;
         document.body.appendChild(script);
 
         return () => {
-            // Limpiar el script al desmontar el componente para evitar fugas de memoria.
             if (document.body.contains(script)) {
                 document.body.removeChild(script);
             }
         };
-    }, []); // El array vacío asegura que este efecto se ejecute solo una vez.
+    }, []);
 
     useEffect(() => {
         const filtered = exerciseData.filter(ej => ej.nivel === config.level);
@@ -1792,7 +1725,6 @@ const CalculoMental = () => {
             return;
         }
 
-        // Persistencia namespaced del juego también
         localStorage.setItem(LS_KEYS.gameConfig, JSON.stringify(config));
 
         setGameState("summary");
@@ -1805,7 +1737,6 @@ const CalculoMental = () => {
                     level: config.level,
                     exerciseCount: config.exerciseCount,
                 },
-                // Extra (por si Summary lo quiere mostrar o guardar):
                 arNamespace: STORAGE_NS,
                 arSelectedStages,
                 arConfig,
@@ -1818,10 +1749,8 @@ const CalculoMental = () => {
         setSetupStep('game');
     };
 
-    // --- LÓGICA DEL JUEGO ---
 
     const handleShowPreview = () => {
-        // Guarda la configuración del juego (namespaced)
         localStorage.setItem(LS_KEYS.gameConfig, JSON.stringify(config));
 
         setGameState("welcome");
@@ -1830,20 +1759,18 @@ const CalculoMental = () => {
 
 
     const handleStartGame = async () => {
-        // Borrar datos de realidad aumentada del localStorage (pero mantener en estado para el juego)
         localStorage.removeItem(LS_KEYS.arSelectedStages);
         localStorage.removeItem(LS_KEYS.arConfig);
         localStorage.removeItem(LS.stages);
         localStorage.removeItem(LS.config);
 
-        // Muestra RA Inicio antes de comenzar (si existe)
         const ok = await showARStageModal('Inicio', {
             confirmButtonText: 'Comenzar',
             showCancelButton: true,
             cancelButtonText: 'Cancelar',
             confirmButtonColor: '#0077b6',
         });
-        if (!ok) return; // si cancela, no inicia
+        if (!ok) return;
 
         const filteredExercises = exerciseData.filter(ej => ej.nivel === config.level);
         const selectedExercises = filteredExercises.sort(() => Math.random() - 0.5).slice(0, config.exerciseCount);
@@ -1879,7 +1806,7 @@ const CalculoMental = () => {
                 setShuffledOptions([...currentExercise.options].sort(() => Math.random() - 0.5));
                 setGameState('answering');
             }
-        }, 800); // Tiempo de visualización de cada número
+        }, 800);
     };
 
     const handleValidate = async () => {
@@ -1893,7 +1820,6 @@ const CalculoMental = () => {
         }
 
         const isCorrect = selectedOption.isCorrect;
-        // Logica de puntuacion: 10 puntos por respuesta correcta.
         const newScore = isCorrect ? gameData.score + 10 : gameData.score;
         setGameData(prev => ({ ...prev, score: newScore }));
 
@@ -1940,7 +1866,6 @@ const CalculoMental = () => {
                     const bgEl = document.getElementById(bgId);
                     cleanupSymbols = cmCreateFloatingSymbols(bgEl);
 
-                    // Inicializar Three.js para texto 3D si existe
                     if (cfg.hasText) {
                         const textContainer = document.getElementById(ids.textContainerId);
                         if (textContainer) {
@@ -1948,7 +1873,6 @@ const CalculoMental = () => {
                         }
                     }
 
-                    // Inicializar Three.js para imagen si existe
                     if (cfg.hasImage) {
                         const imageContainer = document.getElementById(ids.imageContainerId);
                         if (imageContainer) {
@@ -1956,7 +1880,6 @@ const CalculoMental = () => {
                         }
                     }
 
-                    // Inicializar Three.js para video si existe
                     if (cfg.hasVideo) {
                         const videoContainer = document.getElementById(ids.videoContainerId);
                         if (videoContainer) {
@@ -1986,9 +1909,9 @@ const CalculoMental = () => {
                 confirmButtonColor: '#0077b6',
             });
             if (result?.isConfirmed) {
-                handleBackToGenerator(true); // Reinicia
+                handleBackToGenerator(true);
             } else {
-                handleBackToGenerator(); // Finaliza
+                handleBackToGenerator();
             }
         }
     };
@@ -2035,7 +1958,6 @@ const CalculoMental = () => {
                     const bgEl = document.getElementById(bgId);
                     cleanupSymbols = cmCreateFloatingSymbols(bgEl);
 
-                    // Inicializar Three.js para texto 3D si existe
                     if (cfg.hasText) {
                         const textContainer = document.getElementById(ids.textContainerId);
                         if (textContainer) {
@@ -2043,7 +1965,6 @@ const CalculoMental = () => {
                         }
                     }
 
-                    // Inicializar Three.js para imagen si existe
                     if (cfg.hasImage) {
                         const imageContainer = document.getElementById(ids.imageContainerId);
                         if (imageContainer) {
@@ -2051,7 +1972,6 @@ const CalculoMental = () => {
                         }
                     }
 
-                    // Inicializar Three.js para video si existe
                     if (cfg.hasVideo) {
                         const videoContainer = document.getElementById(ids.videoContainerId);
                         if (videoContainer) {
@@ -2079,8 +1999,6 @@ const CalculoMental = () => {
             handleStartGame();
         }
     };
-
-    // --- RENDERIZADO DE VISTAS ---
 
     const renderPreviewArea = () => {
         switch (gameState) {
@@ -2143,26 +2061,8 @@ const CalculoMental = () => {
         </div>
     );
 
-    // Si estamos en el estado 'summary', renderizar solo el componente Summary
-    if (gameState === 'summary') {
-        return (
-            <>
-                {/* <Summary
-                        config={{
-                            level: config.level,
-                            exerciseCount: config.exerciseCount,
-                        }}
-                        onBack={returnToConfig}
-                    />
-                */}
-            </>
-
-        );
-    }
-
     return (
         <>
-            {/* --- ESTILOS CSS (Integrados) --- */}
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
                 
@@ -2231,9 +2131,9 @@ const CalculoMental = () => {
                 }
 
                 .button-group > :only-child {
-                    grid-column: 1 / -1;        /* El hijo ocupa toda la fila (ambas columnas) */
-                    justify-self: center;        /* Centra el hijo dentro de esa fila */
-                    width: min(360px, 100%);     /* Opcional: evita que se vea “gigante” en pantallas grandes */
+                    grid-column: 1 / -1;      
+                    justify-self: center;       
+                    width: min(360px, 100%);   
                 }
 
                 .game-btn.secondary {
@@ -2410,7 +2310,6 @@ const CalculoMental = () => {
                     height: 100%;
                 }
 
-                /* === Fondo/overlay RA estilo script.js === */
                 .cm-ar-bg {
                     position: relative;
                     min-height: 220px;
@@ -2426,12 +2325,10 @@ const CalculoMental = () => {
                     border-radius: 28px;
                 }
 
-                /* Cuando se usa cámara, quitamos el fondo azul */
                 .cm-ar-bg-camera {
                     background: transparent;
                 }
 
-                /* Video de la cámara como fondo */
                 .cm-ar-camera-bg {
                     position: absolute;
                     top: 0;
@@ -2464,7 +2361,6 @@ const CalculoMental = () => {
                     gap: 1rem;
                 }
 
-                /* El "marco" donde va tu canvas Three.js */
                 .cm-ar-three-wrap {
                     width: 100%;
                     height: 240px;
@@ -2473,7 +2369,6 @@ const CalculoMental = () => {
                     z-index: 1;
                 }
 
-                /* Opcional: texto superior tipo "10 puntos" o "Puntuación final" */
                 .cm-ar-top {
                     color: #ffd60a;
                     font-weight: 800;
@@ -2591,7 +2486,6 @@ const CalculoMental = () => {
                 .game-btn.success:hover { background-color: #1e7e34; }
                 .game-btn.success:disabled { background-color: #6c757d; cursor: not-allowed; }
 
-                /* SweetAlert2 Customizations */
                 .swal2-popup {
                     width: auto;
                     border-radius: 28px !important;
@@ -2611,7 +2505,6 @@ const CalculoMental = () => {
                     background-color: rgba(0, 123, 255, 0.05) !important;
                 }
 
-                /* === Estilos de Pestañas RA === */
                 .ar-tabs {
                     display: flex;
                     gap: 0;
@@ -2807,7 +2700,6 @@ const CalculoMental = () => {
                     }
                 }
 
-                /* === Estilos para contenido múltiple en modales RA === */
                 .ar-multi-content {
                     display: flex;
                     flex-direction: column;
@@ -2818,7 +2710,6 @@ const CalculoMental = () => {
                     margin: 0;
                 }
 
-                /* Layout: 1 elemento centrado */
                 .ar-layout-single {
                     display: flex;
                     justify-content: center;
@@ -2826,7 +2717,6 @@ const CalculoMental = () => {
                     width: 100%;
                 }
 
-                /* Layout: texto arriba, media abajo */
                 .ar-layout-text-top {
                     display: flex;
                     flex-direction: column;
@@ -2846,8 +2736,6 @@ const CalculoMental = () => {
                     justify-content: center;
                     width: 100%;
                 }
-
-                /* Layout: elementos en fila (imagen + video) */
                 .ar-layout-row {
                     display: flex;
                     flex-direction: row;
@@ -2858,7 +2746,6 @@ const CalculoMental = () => {
                     flex-wrap: wrap;
                 }
 
-                /* Layout: 3 elementos (texto arriba, imagen+video abajo) */
                 .ar-layout-three {
                     display: flex;
                     flex-direction: column;
@@ -2904,7 +2791,6 @@ const CalculoMental = () => {
                     border-radius: 12px;
                 }
 
-                /* Audio solo: nota musical centrada */
                 .ar-audio-solo {
                     display: flex;
                     flex-direction: column;
@@ -2930,7 +2816,6 @@ const CalculoMental = () => {
                     height: 40px;
                 }
 
-                /* Audio oculto (cuando hay otros elementos) */
                 .ar-audio-hidden {
                     position: absolute;
                     opacity: 0;
@@ -2943,14 +2828,11 @@ const CalculoMental = () => {
                 }
             `}</style>
 
-            {/* --- HTML ESTRUCTURA --- */}
             <div className="app-layout single-panel">
-                {/* PASO 1: Configuración de RA */}
                 {setupStep === "ar" && (
                     <div className="config-panel full-width">
                         <AnimatedTitle />
 
-                        {/* Pestañas de etapas */}
                         <div className="ar-tabs">
                             {AR_STAGES.map((stage) => (
                                 <button
@@ -2964,7 +2846,6 @@ const CalculoMental = () => {
                             ))}
                         </div>
 
-                        {/* Contenido de la pestaña activa */}
                         <div className="ar-tab-content">
                             <div className="ar-tab-header">
                                 <label className="ar-stage-toggle">
@@ -2979,7 +2860,6 @@ const CalculoMental = () => {
 
                             {arSelectedStages[activeARTab] && (
                                 <div className="ar-content-cards">
-                                    {/* Tarjeta de Texto */}
                                     <div className={`ar-content-card ${arConfig?.[activeARTab]?.text?.trim() ? "has-content" : ""}`}>
                                         <div className="ar-card-header">
                                             <span className="ar-card-icon">📝</span>
@@ -3005,7 +2885,6 @@ const CalculoMental = () => {
                                         </div>
                                     </div>
 
-                                    {/* Tarjeta de Imagen */}
                                     <div className={`ar-content-card ${arConfig?.[activeARTab]?.imageUrl?.trim() ? "has-content" : ""}`}>
                                         <div className="ar-card-header">
                                             <span className="ar-card-icon">🖼️</span>
@@ -3043,7 +2922,6 @@ const CalculoMental = () => {
                                         </div>
                                     </div>
 
-                                    {/* Tarjeta de Audio */}
                                     <div className={`ar-content-card ${arConfig?.[activeARTab]?.audioUrl?.trim() ? "has-content" : ""}`}>
                                         <div className="ar-card-header">
                                             <span className="ar-card-icon">🎵</span>
@@ -3081,7 +2959,6 @@ const CalculoMental = () => {
                                         </div>
                                     </div>
 
-                                    {/* Tarjeta de Video */}
                                     <div className={`ar-content-card ${arConfig?.[activeARTab]?.videoUrl?.trim() ? "has-content" : ""}`}>
                                         <div className="ar-card-header">
                                             <span className="ar-card-icon">🎬</span>
@@ -3134,7 +3011,6 @@ const CalculoMental = () => {
                     </div>
                 )}
 
-                {/* PASO 2: Configuración del Juego */}
                 {setupStep === "game" && (
                     <div className="config-panel full-width">
                         <AnimatedTitle />
@@ -3183,7 +3059,6 @@ const CalculoMental = () => {
                     </div>
                 )}
 
-                {/* PASO 3: Vista Previa */}
                 {setupStep === "preview" && (
                     <div className="preview-panel full-width">
                         <AnimatedTitle />

@@ -1,17 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-/**
- * Encriptación.jsx
- * Adaptación del juego “Encriptación” a React (formato .jsx), siguiendo la misma estructura
- * de “CalculoMental.jsx”:
- *   1) Wizard de Configuración: RA -> Juego
- *   2) Panel izquierdo (config) + panel derecho (vista previa / juego)
- *   3) Modales RA sin cámara con SweetAlert2 + (opcional) Three.js para contenido 3D
- */
-
-// =======================
-// 1) CONFIGURACIÓN (LS)
-// =======================
 const STORAGE_NS = "ar:encriptacion";
 const LS = {
   arStages: `${STORAGE_NS}:selectedStages`,
@@ -34,15 +22,9 @@ const writeJSON = (key, value) => {
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch {
-    // Sin acción: si localStorage falla, el juego sigue funcionando en memoria.
   }
 };
 
-// =======================
-// 2) UTILIDADES DE JUEGO
-// =======================
-
-// Alfabeto español (incluye Ñ), igual que en tu script.js
 const ALPHABET_ES = [
   "A",
   "B",
@@ -73,12 +55,6 @@ const ALPHABET_ES = [
   "Z",
 ];
 
-/**
- * encrypt(text)
- * Convierte cada letra a su índice en ALPHABET_ES con 2 dígitos (00-26).
- * - Espacio: devuelve doble espacio, para separar palabras.
- * - Carácter fuera de alfabeto: se conserva.
- */
 function encrypt(text) {
   return String(text)
     .split("")
@@ -101,13 +77,8 @@ function shuffle(arr) {
   return a;
 }
 
-// =======================
-// 3) SWEETALERT / TOAST
-// =======================
-
 function ensureSwal() {
   if (!window.Swal) {
-    // No usar alert, simplemente retornar false
     console.warn("SweetAlert2 aún no ha cargado.");
     return false;
   }
@@ -128,11 +99,6 @@ function toast(message, type = "info") {
   });
 }
 
-// =======================
-// 4) THREE.JS (CARGA LAZY)
-// =======================
-
-// Cargadores (referencias) para evitar múltiples descargas
 const useThreeLoaders = () => {
   const threeLoadRef = useRef(null);
   const threeAddonsRef = useRef(null);
@@ -141,7 +107,6 @@ const useThreeLoaders = () => {
     if (window.THREE) return Promise.resolve(window.THREE);
     if (threeLoadRef.current) return threeLoadRef.current;
 
-    // Preferimos ESM (estable en Vite)
     threeLoadRef.current = import("https://esm.sh/three@0.160.1")
       .then((mod) => {
         const THREE = { ...mod };
@@ -149,7 +114,6 @@ const useThreeLoaders = () => {
         return THREE;
       })
       .catch(() => {
-        // Fallback legacy
         return new Promise((resolve, reject) => {
           const script = document.createElement("script");
           script.src = "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js";
@@ -181,10 +145,6 @@ const useThreeLoaders = () => {
   return { ensureThree, ensureThreeTextAddons };
 };
 
-// =======================
-// 5) FONDO DECORADO + SÍMBOLOS FLOTANTES
-// =======================
-
 const ENCRYPT_SYMBOLS = ["🔐", "🗝️", "01", "10", "Ñ", "Z", "🧩", "🧠"];
 
 function createFloatingSymbols(container) {
@@ -198,8 +158,8 @@ function createFloatingSymbols(container) {
     const el = document.createElement("div");
     el.textContent = symbol;
 
-    const size = Math.random() * 26 + 18; // 18–44px
-    const duration = Math.random() * 5 + 5; // 5–10s
+    const size = Math.random() * 26 + 18;
+    const duration = Math.random() * 5 + 5;
     const left = Math.random() * 80 + 10;
     const top = Math.random() * 80 + 10;
     const dx = Math.random() * 30 - 15;
@@ -240,7 +200,6 @@ function createFloatingSymbols(container) {
   };
 }
 
-// Función para iniciar la cámara en el fondo
 async function startCamera(videoElementId) {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -259,7 +218,6 @@ async function startCamera(videoElementId) {
   }
 }
 
-// Función para detener la cámara
 function stopCamera(stream) {
   if (stream) {
     stream.getTracks().forEach(track => track.stop());
@@ -276,18 +234,6 @@ function buildDecoratedHtml({ bgId, topHtml = "", innerHtml = "", useCamera = fa
   `;
 }
 
-// =======================
-// 6) RENDER 3D POR ETAPA (MINIMAL)
-// =======================
-
-/**
- * initThreeStage(container, stageCfg)
- * Renderiza un “panel 3D” para Texto3D/Imagen/Audio/Video.
- * - Texto normal se renderiza como HTML (sin Three).
- *
- * Importante: este render 3D es deliberadamente “minimal” para mantener el archivo manejable.
- * Si quieres, podemos migrar el initThreeStage completo desde CalculoMental.jsx.
- */
 function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
   return function initThreeStage(container, stageCfg) {
     if (!container) return () => {};
@@ -352,7 +298,6 @@ function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
         }
       } catch {}
 
-      // Limpieza extra de Three (si existe)
       try {
         if (scene) {
           scene.traverse((obj) => {
@@ -383,10 +328,6 @@ function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
       camera = new THREE.PerspectiveCamera(55, w / h, 0.1, 100);
       camera.position.set(0, 0, 6);
 
-      // Iluminación básica (solo para tipos que la necesiten)
-      // La iluminación se agrega por tipo específico, no globalmente
-
-      // Funciones helper para Video
       const createGlowTexture = () => {
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
@@ -474,9 +415,7 @@ function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
         }
       };
 
-      // Contenido por tipo
       if (stageCfg.type === "Texto") {
-        // Iluminación para texto 3D
         const ambient = new THREE.AmbientLight(0xffffff, 1.2);
         scene.add(ambient);
         const dir = new THREE.DirectionalLight(0xffffff, 1.5);
@@ -486,7 +425,6 @@ function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
         const { FontLoader, TextGeometry } = await ensureThreeTextAddons();
 
         const loader = new FontLoader();
-        // Fuente helvetiker en CDN (compatible con TextGeometry)
         const font = await new Promise((resolve, reject) => {
           loader.load(
             "https://threejs.org/examples/fonts/helvetiker_bold.typeface.json",
@@ -530,18 +468,15 @@ function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
       }
 
       if (stageCfg.type === "Imagen") {
-        // Crear el root group que rotará
         const root = new THREE.Group();
         scene.add(root);
 
-        // Crear el plano frontal
         const plane = new THREE.Mesh(
           new THREE.PlaneGeometry(1, 1),
           new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true })
         );
         root.add(plane);
 
-        // Crear el plano trasero (para ver la imagen por ambos lados)
         const planeBack = new THREE.Mesh(
           plane.geometry.clone(),
           plane.material.clone()
@@ -550,7 +485,6 @@ function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
         planeBack.visible = false;
         root.add(planeBack);
 
-        // Función para ajustar el tamaño del plano según el aspect ratio
         const fitPlaneToAspect = (aspect, baseSize = 4.8) => {
           if (!aspect) return;
           if (aspect >= 1) {
@@ -566,7 +500,6 @@ function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
           }
         };
 
-        // Cargar la textura
         const loader = new THREE.TextureLoader();
         loader.setCrossOrigin("anonymous");
         loader.load(
@@ -577,7 +510,6 @@ function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
             plane.material.map = texture;
             plane.material.needsUpdate = true;
 
-            // Textura para el lado trasero (invertida)
             const backTexture = texture.clone();
             backTexture.colorSpace = THREE.SRGBColorSpace;
             backTexture.wrapS = THREE.RepeatWrapping;
@@ -587,8 +519,6 @@ function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
             planeBack.material.map = backTexture;
             planeBack.material.needsUpdate = true;
             planeBack.visible = true;
-
-            // Ajustar tamaño al aspect ratio de la imagen
             fitPlaneToAspect(texture.image.width / texture.image.height);
           },
           undefined,
@@ -599,10 +529,9 @@ function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
           }
         );
 
-        // Animación de rotación completa
         const animate = () => {
           if (disposed) return;
-          root.rotation.y += 0.01; // Rotación continua de 360 grados
+          root.rotation.y += 0.01;
           renderer.render(scene, camera);
           rafId = requestAnimationFrame(animate);
         };
@@ -610,7 +539,6 @@ function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
       }
 
       if (stageCfg.type === "Video") {
-        // Iluminación para el portal del video
         const ambient = new THREE.AmbientLight(0xffffff, 0.35);
         scene.add(ambient);
         const rim = new THREE.PointLight(0x7ffcff, 1.1);
@@ -628,11 +556,9 @@ function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
         videoTexture = new THREE.VideoTexture(videoEl);
         videoTexture.colorSpace = THREE.SRGBColorSpace;
 
-        // Crear el grupo portal
         portalGroup = new THREE.Group();
         scene.add(portalGroup);
 
-        // Crear el plano del video
         const plane = new THREE.Mesh(
           new THREE.PlaneGeometry(1, 1),
           new THREE.MeshBasicMaterial({
@@ -644,7 +570,6 @@ function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
         plane.position.z = -0.06;
         portalGroup.add(plane);
 
-        // Crear el glow
         const glowTexture = createGlowTexture();
         if (glowTexture) {
           const glowMaterial = new THREE.MeshBasicMaterial({
@@ -658,11 +583,9 @@ function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
           portalGroup.add(portalGlow);
         }
 
-        // Crear el marco
         portalFrameGroup = new THREE.Group();
         portalGroup.add(portalFrameGroup);
 
-        // Crear partículas
         const particleCount = 160;
         const positions = new Float32Array(particleCount * 3);
         portalParticleMeta = [];
@@ -688,7 +611,6 @@ function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
         portalParticles = new THREE.Points(particleGeo, particleMat);
         portalGroup.add(portalParticles);
 
-        // Función para ajustar el tamaño del plano según el aspect ratio
         const fitPlaneToAspect = (aspect, baseSize = 8) => {
           if (!aspect) return;
           if (aspect >= 1) {
@@ -706,10 +628,8 @@ function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
           }
         };
 
-        // Ajustar tamaño inicial (16:9 por defecto)
         fitPlaneToAspect(16 / 9);
 
-        // Listener para ajustar cuando se cargue el video
         videoMetadataHandler = () => {
           if (videoEl.videoWidth && videoEl.videoHeight) {
             fitPlaneToAspect(videoEl.videoWidth / videoEl.videoHeight);
@@ -717,10 +637,8 @@ function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
         };
         videoEl.addEventListener("loadedmetadata", videoMetadataHandler);
 
-        // Iniciar reproducción
         videoEl.play().catch(() => {});
 
-        // Handler para pausar/reproducir al hacer click
         toggleClickHandler = () => {
           if (videoEl.paused) {
             videoEl.muted = false;
@@ -731,11 +649,8 @@ function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
         };
         container.addEventListener("click", toggleClickHandler);
 
-        // Animación
         const animate = () => {
           if (disposed) return;
-
-          // Animación flotante del portal
           const now = performance.now();
           const floatY = Math.sin(now * 0.0011) * 0.06;
           const floatX = Math.cos(now * 0.0009) * 0.02;
@@ -744,7 +659,6 @@ function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
           portalGroup.rotation.z = Math.sin(now * 0.0006) * 0.04;
           portalGroup.rotation.y = Math.cos(now * 0.0005) * 0.04;
 
-          // Rotación de partículas
           if (portalParticles) {
             portalParticles.rotation.z += 0.002;
             portalParticles.rotation.y += 0.001;
@@ -757,14 +671,12 @@ function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
       }
 
       if (stageCfg.type === "Audio") {
-        // Iluminación para audio
         const ambient = new THREE.AmbientLight(0xffffff, 1.0);
         scene.add(ambient);
         const point = new THREE.PointLight(0xffffff, 1.4);
         point.position.set(2, 3, 4);
         scene.add(point);
 
-        // Crear la nota musical 3D (igual que en CalculoMental.jsx)
         const noteMaterial = new THREE.MeshStandardMaterial({
           color: 0xffd166,
           emissive: 0xffb703,
@@ -775,7 +687,6 @@ function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
 
         const noteGroup = new THREE.Group();
 
-        // Cabeza de la nota (esfera)
         const head = new THREE.Mesh(
           new THREE.SphereGeometry(0.22, 24, 24),
           noteMaterial
@@ -783,7 +694,6 @@ function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
         head.position.set(-0.15, -0.1, 0);
         noteGroup.add(head);
 
-        // Tallo de la nota (cilindro)
         const stem = new THREE.Mesh(
           new THREE.CylinderGeometry(0.04, 0.04, 0.8, 12),
           noteMaterial
@@ -791,7 +701,6 @@ function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
         stem.position.set(0.1, 0.35, 0);
         noteGroup.add(stem);
 
-        // Bandera de la nota
         const flag = new THREE.Mesh(
           new THREE.BoxGeometry(0.35, 0.12, 0.08),
           noteMaterial
@@ -804,7 +713,6 @@ function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
 
         scene.add(noteGroup);
 
-        // Configurar audio con THREE.Audio
         const listener = new THREE.AudioListener();
         camera.add(listener);
         audioInstance = new THREE.Audio(listener);
@@ -832,7 +740,6 @@ function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
           }
         );
 
-        // Handler para pausar/reproducir al hacer click
         toggleClickHandler = () => {
           if (!audioInstance.buffer) return;
           if (audioInstance.isPlaying) audioInstance.pause();
@@ -842,13 +749,11 @@ function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
 
         const animate = () => {
           if (disposed) return;
-
-          // Animar la nota musical según el audio
           if (noteGroup && audioAnalyser) {
             const raw = audioAnalyser.getAverageFrequency() / 255;
             notePulse += (raw - notePulse) * 0.15;
             const scale = 1 + notePulse * 0.5;
-            noteGroup.scale.setScalar(scale * 2); // Multiplicar por 2 para mantener el tamaño base
+            noteGroup.scale.setScalar(scale * 2);
             noteGroup.position.y = notePulse * 0.35;
           }
 
@@ -858,7 +763,6 @@ function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
         animate();
       }
 
-      // Resize reactivo
       resizeObserver = new ResizeObserver(() => {
         if (!renderer || !camera || disposed) return;
         const nw = Math.max(260, container.clientWidth);
@@ -869,42 +773,31 @@ function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
       });
       resizeObserver.observe(container);
     })().catch(() => {
-      // Si falla Three, no rompemos el modal.
     });
 
     return cleanup;
   };
 }
 
-// =======================
-// 7) COMPONENTE
-// =======================
-
 export default function Encriptacion() {
-  // 7.1) Loaders (Three)
   const { ensureThree, ensureThreeTextAddons } = useThreeLoaders();
   const initThreeStage = useMemo(
     () => initThreeStageFactory({ ensureThree, ensureThreeTextAddons }),
     [ensureThree, ensureThreeTextAddons]
   );
 
-  // 7.2) Estado del wizard
   const [setupStep, setSetupStep] = useState("ar");
 
-  // Pestaña activa en la configuración de RA
   const [activeARTab, setActiveARTab] = useState("Inicio");
 
-  // 7.3) Estado RA
   const [arSelectedStages, setArSelectedStages] = useState(() =>
     readJSON(LS.arStages, { Inicio: false, Acierto: false, Final: false })
   );
 
-  // Nueva estructura: cada etapa puede tener los 4 tipos de contenido
   const [arConfig, setArConfig] = useState(() =>
     readJSON(LS.arConfig, {})
   );
 
-  // Normaliza la configuración de una etapa
   const normalizeStageConfig = (stageCfg = {}) => {
     const text = stageCfg.text ?? "";
     const imageUrl = stageCfg.imageUrl ?? "";
@@ -937,11 +830,9 @@ export default function Encriptacion() {
     return !!(cfg.text?.trim() || cfg.imageUrl?.trim() || cfg.audioUrl?.trim() || cfg.videoUrl?.trim());
   };
 
-  // Construye el HTML para mostrar TODOS los contenidos configurados en una etapa
   const buildMultiContentHtml = (stageCfg, ids) => {
     const cfg = normalizeStageConfig(stageCfg);
 
-    // Contar elementos visuales (sin audio)
     const visualElements = [];
     if (cfg.hasText) visualElements.push('text');
     if (cfg.hasImage) visualElements.push('image');
@@ -950,7 +841,6 @@ export default function Encriptacion() {
     const visualCount = visualElements.length;
     const isAudioOnly = cfg.hasAudio && visualCount === 0;
 
-    // Construir elementos individuales
     const textHtml = cfg.hasText ? `
       <div class="ar-multi-text-3d">
         <div id="${ids.textContainerId}" class="ar-three-container"></div>
@@ -969,7 +859,6 @@ export default function Encriptacion() {
       </div>
     ` : '';
 
-    // Audio: nota musical cuando está solo, reproductor oculto cuando hay otros elementos
     const audioHtml = cfg.hasAudio ? (
       isAudioOnly
         ? `<div class="ar-audio-solo">
@@ -981,9 +870,6 @@ export default function Encriptacion() {
            </div>`
     ) : '';
 
-    // === LAYOUTS SEGÚN COMBINACIÓN ===
-
-    // 1 elemento visual: centrado
     if (visualCount === 1) {
       return `
         <div class="ar-layout-single">
@@ -993,7 +879,6 @@ export default function Encriptacion() {
       `;
     }
 
-    // Solo audio: nota musical centrada
     if (isAudioOnly) {
       return `
         <div class="ar-layout-single">
@@ -1002,9 +887,7 @@ export default function Encriptacion() {
       `;
     }
 
-    // 2 elementos visuales
     if (visualCount === 2) {
-      // Texto + Imagen: texto arriba, imagen abajo
       if (cfg.hasText && cfg.hasImage) {
         return `
           <div class="ar-layout-text-top">
@@ -1014,7 +897,6 @@ export default function Encriptacion() {
           ${audioHtml}
         `;
       }
-      // Texto + Video: texto arriba, video abajo
       if (cfg.hasText && cfg.hasVideo) {
         return `
           <div class="ar-layout-text-top">
@@ -1024,7 +906,6 @@ export default function Encriptacion() {
           ${audioHtml}
         `;
       }
-      // Imagen + Video: misma fila
       if (cfg.hasImage && cfg.hasVideo) {
         return `
           <div class="ar-layout-row">
@@ -1036,7 +917,6 @@ export default function Encriptacion() {
       }
     }
 
-    // 3 elementos visuales: Texto + Imagen + Video
     if (visualCount === 3) {
       return `
         <div class="ar-layout-three">
@@ -1050,12 +930,9 @@ export default function Encriptacion() {
       `;
     }
 
-    // Fallback: apilar todo
     return `${textHtml}${imageHtml}${videoHtml}${audioHtml}`;
   };
 
-  // Nota: los ObjectURL no sobreviven a un refresh. Si necesitas persistencia real,
-  // conviene base64 o subir a servidor.
   const mediaObjectUrlsRef = useRef({});
   useEffect(() => {
     return () => {
@@ -1068,7 +945,6 @@ export default function Encriptacion() {
     };
   }, []);
 
-  // Persistencia ligera (a medida que editas)
   useEffect(() => {
     writeJSON(LS.arStages, arSelectedStages);
   }, [arSelectedStages]);
@@ -1077,7 +953,6 @@ export default function Encriptacion() {
     writeJSON(LS.arConfig, arConfig);
   }, [arConfig]);
 
-  // 7.4) Estado de configuración del juego
   const [gameConfig, setGameConfig] = useState(() =>
     readJSON(LS.gameConfig, { level: "basico", exerciseCount: 1 })
   );
@@ -1086,7 +961,6 @@ export default function Encriptacion() {
     writeJSON(LS.gameConfig, gameConfig);
   }, [gameConfig]);
 
-  // 7.5) Cargar SweetAlert2 dinámicamente
   useEffect(() => {
     const script = document.createElement('script');
     script.src = "https://cdn.jsdelivr.net/npm/sweetalert2@11";
@@ -1100,11 +974,9 @@ export default function Encriptacion() {
     };
   }, []);
 
-  // 7.6) Banco de ejercicios
   const [exerciseBank, setExerciseBank] = useState({ basico: [], intermedio: [], avanzado: [] });
 
   useEffect(() => {
-    // Nota: se espera ejercicios.json en /public
     fetch("/encrip/ejercicios.json")
       .then((r) => r.json())
       .then((data) => {
@@ -1123,7 +995,6 @@ export default function Encriptacion() {
     return (exerciseBank?.[gameConfig.level] ?? []).length;
   }, [exerciseBank, gameConfig.level]);
 
-  // Ajusta exerciseCount si el nivel cambia
   useEffect(() => {
     if (availableCount === 0) return;
     if (gameConfig.exerciseCount > availableCount) {
@@ -1134,17 +1005,12 @@ export default function Encriptacion() {
     }
   }, [availableCount]);
 
-  // 7.7) Estado del juego
-  const [gameState, setGameState] = useState("config"); // config | welcome | playing
+  const [gameState, setGameState] = useState("config");
   const [pickedExercises, setPickedExercises] = useState([]);
   const [stepIndex, setStepIndex] = useState(0);
   const [score, setScore] = useState(0);
   const [encryptedText, setEncryptedText] = useState("");
   const [answer, setAnswer] = useState("");
-
-  // =======================
-  // 8) HANDLERS RA
-  // =======================
 
   const toggleARStage = (stage) => {
     setArSelectedStages((prev) => ({ ...prev, [stage]: !prev[stage] }));
@@ -1183,7 +1049,6 @@ export default function Encriptacion() {
       return { ok: false, msg: "Selecciona al menos una etapa de RA (Inicio/Acierto/Final)." };
     }
 
-    // Verificar que cada etapa habilitada tenga al menos un contenido
     for (const stage of enabledStages) {
       const cfg = arConfig?.[stage] ?? {};
       const hasText = !!cfg.text?.trim();
@@ -1208,10 +1073,8 @@ export default function Encriptacion() {
       .replaceAll("'", "&#039;");
 
   const showStageModal = async (stage, swalOverrides = {}) => {
-    // 1) Solo si la etapa está seleccionada
     if (!arSelectedStages?.[stage]) return true;
 
-    // 2) Solo si hay contenido real
     const stageCfg = arConfig?.[stage] ?? {};
     if (!hasStageContent(stageCfg)) return true;
     if (!ensureSwal()) return false;
@@ -1241,7 +1104,6 @@ export default function Encriptacion() {
       videoId,
     });
 
-    // 3) Modal tipo script.js (overlay)
     const res = await window.Swal?.fire({
       html,
       confirmButtonText: "Continuar",
@@ -1254,7 +1116,6 @@ export default function Encriptacion() {
         const bgEl = document.getElementById(bgId);
         cleanupSymbols = createFloatingSymbols(bgEl);
 
-        // Inicializar Three.js para cada tipo de contenido
         if (cfg.hasText) {
           const container = document.getElementById(ids.textContainerId);
           if (container) cleanups.push(initThreeStage(container, { type: "Texto", text: cfg.text }));
@@ -1286,7 +1147,6 @@ export default function Encriptacion() {
     if (isEnabled) {
       const contents = [];
 
-      // Verificar cada tipo de contenido
       if (stageCfg?.text?.trim()) {
         contents.push(`<div class="ra-content-item"><span class="ra-icon">📝</span> Texto configurado</div>`);
       }
@@ -1375,10 +1235,6 @@ export default function Encriptacion() {
     }
   };
 
-  // =======================
-  // 9) HANDLERS JUEGO
-  // =======================
-
   const prepareRun = () => {
     const pool = exerciseBank?.[gameConfig.level] ?? [];
     if (pool.length === 0) {
@@ -1395,7 +1251,7 @@ export default function Encriptacion() {
     setEncryptedText("");
     setAnswer("");
     setGameState("welcome");
-    setSetupStep("playing"); // Ir a pantalla de juego
+    setSetupStep("playing"); 
   };
 
   const loadCurrentChallenge = (idx) => {
@@ -1408,14 +1264,13 @@ export default function Encriptacion() {
   };
 
   const handleStartGame = async () => {
-    // Muestra RA Inicio antes de comenzar (si existe)
     const ok = await showStageModal('Inicio', {
       confirmButtonText: 'Comenzar',
       showCancelButton: true,
       cancelButtonText: 'Cancelar',
       confirmButtonColor: '#0077b6',
     });
-    if (!ok) return; // si cancela, no inicia
+    if (!ok) return;
 
     loadCurrentChallenge(0);
   };
@@ -1448,7 +1303,6 @@ export default function Encriptacion() {
           setStepIndex(next);
           loadCurrentChallenge(next);
         } else {
-          // Mostrar modal final
           await showStageModal('Final', {
             title: 'Juego Completado',
             icon: 'info',
@@ -1457,7 +1311,6 @@ export default function Encriptacion() {
             cancelButtonText: 'Volver a Jugar',
             confirmButtonColor: '#0077b6',
           });
-          // Reiniciar a configuración
           setGameState("config");
           setPickedExercises([]);
           setStepIndex(0);
@@ -1465,7 +1318,6 @@ export default function Encriptacion() {
           setAnswer("");
         }
       } else {
-        // Canceló, volver a config
         setGameState("config");
         setPickedExercises([]);
         setStepIndex(0);
@@ -1484,7 +1336,6 @@ export default function Encriptacion() {
         confirmButtonColor: '#0077b6',
       });
       if (result?.isConfirmed) {
-        // Reinicia el juego
         setPickedExercises([]);
         setStepIndex(0);
         setScore(0);
@@ -1492,7 +1343,6 @@ export default function Encriptacion() {
         setAnswer("");
         setGameState("welcome");
       } else {
-        // Finaliza
         setGameState("config");
         setPickedExercises([]);
         setStepIndex(0);
@@ -1503,11 +1353,6 @@ export default function Encriptacion() {
     }
   };
 
-  // =======================
-  // 10) UI (VISTA PREVIA)
-  // =======================
-
-  // Renderiza la pantalla del juego (welcome o playing)
   const renderGameScreen = () => {
     if (gameState === "welcome") {
       return (
@@ -1536,7 +1381,6 @@ export default function Encriptacion() {
       );
     }
 
-    // playing
     return (
       <div className="enc-screen">
         <div className="enc-panel enc-game-panel">
@@ -1580,10 +1424,6 @@ export default function Encriptacion() {
       </div>
     );
   };
-
-  // =======================
-  // 11) RENDER PRINCIPAL
-  // =======================
 
   return (
     <>
@@ -1853,11 +1693,6 @@ export default function Encriptacion() {
           .enc-image-reference { flex: 1 1 auto; }
           .enc-game-layout { flex-direction: column; }
         }
-
-        /* ======================= */
-        /* SweetAlert2 (RA Modals) */
-        /* ======================= */
-
         .swal2-popup { border-radius: 28px !important; width: auto; }
         .swal2-title { font-family: 'Poppins', sans-serif; }
         .swal2-html-container { font-family: 'Poppins', sans-serif; }
@@ -1883,12 +1718,10 @@ export default function Encriptacion() {
           border-radius: 28px;
         }
 
-        /* Cuando se usa cámara, quitamos el fondo azul */
         .enc-ar-bg-camera {
           background: transparent;
         }
 
-        /* Video de la cámara como fondo */
         .enc-ar-camera-bg {
           position: absolute;
           top: 0;
@@ -1953,10 +1786,6 @@ export default function Encriptacion() {
           width: 100%;
           height: 100%;
         }
-
-        /* ======================= */
-        /* AR Tabs y Tarjetas      */
-        /* ======================= */
 
         .ar-tabs {
           display: flex;
@@ -2138,7 +1967,6 @@ export default function Encriptacion() {
           }
         }
 
-        /* === Estilos para contenido múltiple en modales RA === */
         .ar-multi-content {
           display: flex;
           flex-direction: column;
@@ -2149,7 +1977,6 @@ export default function Encriptacion() {
           margin: 0;
         }
 
-        /* Layout: 1 elemento centrado */
         .ar-layout-single {
           display: flex;
           justify-content: center;
@@ -2157,7 +1984,6 @@ export default function Encriptacion() {
           width: 100%;
         }
 
-        /* Layout: texto arriba, media abajo */
         .ar-layout-text-top {
           display: flex;
           flex-direction: column;
@@ -2178,7 +2004,6 @@ export default function Encriptacion() {
           width: 100%;
         }
 
-        /* Layout: elementos en fila (imagen + video) */
         .ar-layout-row {
           display: flex;
           flex-direction: row;
@@ -2188,8 +2013,6 @@ export default function Encriptacion() {
           width: 100%;
           flex-wrap: wrap;
         }
-
-        /* Layout: 3 elementos (texto arriba, imagen+video abajo) */
         .ar-layout-three {
           display: flex;
           flex-direction: column;
@@ -2235,7 +2058,6 @@ export default function Encriptacion() {
           border-radius: 12px;
         }
 
-        /* Audio solo: nota musical centrada */
         .ar-audio-solo {
           display: flex;
           flex-direction: column;
@@ -2261,7 +2083,6 @@ export default function Encriptacion() {
           height: 40px;
         }
 
-        /* Audio oculto (cuando hay otros elementos) */
         .ar-audio-hidden {
           position: absolute;
           opacity: 0;
@@ -2274,7 +2095,6 @@ export default function Encriptacion() {
         }
       `}</style>
 
-      {/* PANTALLA 1: Configuración de RA */}
       {setupStep === "ar" && (
         <div className="enc-screen">
           <div className="enc-panel enc-single-panel">
@@ -2283,7 +2103,6 @@ export default function Encriptacion() {
               Configuración de RA
             </h2>
 
-            {/* Pestañas de etapas */}
             <div className="ar-tabs">
               {AR_STAGES.map((stage) => (
                 <button
@@ -2297,7 +2116,6 @@ export default function Encriptacion() {
               ))}
             </div>
 
-            {/* Contenido de la pestaña activa */}
             <div className="ar-tab-content">
               <div className="ar-stage-toggle-row">
                 <label className="ra-stage-toggle">
@@ -2312,7 +2130,6 @@ export default function Encriptacion() {
 
               {arSelectedStages[activeARTab] && (
                 <div className="ar-content-cards">
-                  {/* Tarjeta de Texto */}
                   <div className={`ar-content-card ${arConfig?.[activeARTab]?.text?.trim() ? "has-content" : ""}`}>
                     <div className="ar-card-header">
                       <span className="ar-card-icon">📝</span>
@@ -2338,7 +2155,6 @@ export default function Encriptacion() {
                     </div>
                   </div>
 
-                  {/* Tarjeta de Imagen */}
                   <div className={`ar-content-card ${arConfig?.[activeARTab]?.imageUrl?.trim() ? "has-content" : ""}`}>
                     <div className="ar-card-header">
                       <span className="ar-card-icon">🖼️</span>
@@ -2372,7 +2188,6 @@ export default function Encriptacion() {
                     </div>
                   </div>
 
-                  {/* Tarjeta de Audio */}
                   <div className={`ar-content-card ${arConfig?.[activeARTab]?.audioUrl?.trim() ? "has-content" : ""}`}>
                     <div className="ar-card-header">
                       <span className="ar-card-icon">🎵</span>
@@ -2406,7 +2221,6 @@ export default function Encriptacion() {
                     </div>
                   </div>
 
-                  {/* Tarjeta de Video */}
                   <div className={`ar-content-card ${arConfig?.[activeARTab]?.videoUrl?.trim() ? "has-content" : ""}`}>
                     <div className="ar-card-header">
                       <span className="ar-card-icon">🎬</span>
@@ -2456,7 +2270,6 @@ export default function Encriptacion() {
         </div>
       )}
 
-      {/* PANTALLA 2: Configuración del juego */}
       {setupStep === "game" && (
         <div className="enc-screen">
           <div className="enc-panel enc-single-panel">
@@ -2510,7 +2323,6 @@ export default function Encriptacion() {
         </div>
       )}
 
-      {/* PANTALLA 3: El juego */}
       {setupStep === "playing" && renderGameScreen()}
     </>
   );

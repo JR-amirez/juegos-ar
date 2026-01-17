@@ -1,15 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 
-// =======================
-// CONFIGURACIÓN RA (localStorage)
-// =======================
 const STORAGE_NS = "ar:blockly";
 const LS = {
   arStages: `${STORAGE_NS}:selectedStages`,
   arConfig: `${STORAGE_NS}:config`,
 };
 
-const AR_STAGES = ["Acierto"]; // Solo Acierto para Blockly
+const AR_STAGES = ["Acierto"];
 
 const readJSON = (key, fallback) => {
   try {
@@ -26,9 +23,6 @@ const writeJSON = (key, value) => {
   } catch {}
 };
 
-// =======================
-// THREE.JS (CARGA LAZY)
-// =======================
 const useThreeLoaders = () => {
   const threeLoadRef = useRef(null);
   const threeAddonsRef = useRef(null);
@@ -75,9 +69,6 @@ const useThreeLoaders = () => {
   return { ensureThree, ensureThreeTextAddons };
 };
 
-// =======================
-// SÍMBOLOS FLOTANTES (Blockly themed)
-// =======================
 const BLOCKLY_SYMBOLS = ["{ }", "< >", "( )", "[ ]", "=>", "++", "&&", "||"];
 
 function createFloatingSymbols(container) {
@@ -134,7 +125,6 @@ function createFloatingSymbols(container) {
   };
 }
 
-// Función para iniciar la cámara en el fondo
 async function startCamera(videoElementId) {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -153,7 +143,6 @@ async function startCamera(videoElementId) {
   }
 }
 
-// Función para detener la cámara
 function stopCamera(stream) {
   if (stream) {
     stream.getTracks().forEach(track => track.stop());
@@ -170,9 +159,6 @@ function buildDecoratedHtml({ bgId, topHtml = "", innerHtml = "", useCamera = fa
   `;
 }
 
-// =======================
-// RENDER 3D POR ETAPA
-// =======================
 function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
   return function initThreeStage(container, stageCfg) {
     if (!container) return () => {};
@@ -268,11 +254,6 @@ function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
       const dir = new THREE.DirectionalLight(0xffffff, 0.9);
       dir.position.set(3, 5, 4);
       scene.add(dir);
-
-      /* const bgGeo = new THREE.SphereGeometry(18, 32, 32);
-      const bgMat = new THREE.MeshBasicMaterial({ color: 0x6366f1, transparent: true, opacity: 0.12, side: THREE.BackSide });
-      const bg = new THREE.Mesh(bgGeo, bgMat);
-      scene.add(bg); */
 
       const createGlowTexture = () => {
         const canvas = document.createElement("canvas");
@@ -707,31 +688,24 @@ function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
   };
 }
 
-// --- Carga de SweetAlert2 ---
-// Este componente carga el script de SweetAlert2
 const SweetAlertLoader = ({ onLoaded }) => {
   useEffect(() => {
-    // 1. Si ya está cargado (de una carga anterior), avisar y salir.
     if (window.Swal) {
       onLoaded();
       return;
     }
 
-    // 2. Si ya estamos cargándolo (flag), no hacer nada.
-    //    El 'onload' original se encargará de avisar.
     if (window.swalScriptLoading) {
-      // Si por alguna razón el flag está pero Swal existe, forzamos
       if (window.Swal) {
         onLoaded();
       }
       return;
     }
 
-    // 3. Marcar que estamos cargando
     window.swalScriptLoading = true;
 
     const script = document.createElement('script');
-    script.src = "https://cdn.jsdelivr.net/npm/sweetalert2@11"; // Corregido: de '//' a 'https://'
+    script.src = "https://cdn.jsdelivr.net/npm/sweetalert2@11"; 
     script.async = true;
     script.onload = () => {
       onLoaded();
@@ -743,27 +717,21 @@ const SweetAlertLoader = ({ onLoaded }) => {
     };
     document.body.appendChild(script);
 
-  }, [onLoaded]); // onLoaded es estable
+  }, [onLoaded]);
   return null;
 };
 
-// --- Carga de Blockly ---
-// Carga la biblioteca principal de Blockly y el módulo de idioma español
-const BlocklyLoader = ({ onLoaded }) => { // Prop renombrada y eliminada la duplicación
+const BlocklyLoader = ({ onLoaded }) => {
   useEffect(() => {
-    // 1. Si ya está cargado, avisar y salir
-    // (Comprobamos 'Msg' porque es lo último que se carga)
     if (window.Blockly && window.Blockly.Msg && window.Blockly.Msg.ES) {
       onLoaded();
       return;
     }
 
-    // 2. Si ya estamos cargando, no hacer nada.
     if (window.blocklyScriptLoading) {
       return;
     }
     
-    // 3. Marcar que estamos cargando
     window.blocklyScriptLoading = true;
 
     const blocklyScript = document.createElement('script');
@@ -774,8 +742,7 @@ const BlocklyLoader = ({ onLoaded }) => { // Prop renombrada y eliminada la dupl
       langScript.src = "https://unpkg.com/blockly/msg/es.js";
       langScript.async = true;
       langScript.onload = () => {
-        // Scripts cargados
-        onLoaded(); // Usar la nueva prop
+        onLoaded();
         window.blocklyScriptLoading = false;
       };
       langScript.onerror = () => {
@@ -789,13 +756,10 @@ const BlocklyLoader = ({ onLoaded }) => { // Prop renombrada y eliminada la dupl
       window.blocklyScriptLoading = false;
     };
     document.body.appendChild(blocklyScript);
-  }, [onLoaded]); // Actualizar dependencia
+  }, [onLoaded]);
   return null;
 };
 
-
-// --- Estilos de Tailwind (Scoped) ---
-// Estilos limitados al contenedor .blockly-scope para evitar afectar otros componentes
 const TailwindStyles = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
@@ -829,7 +793,6 @@ const TailwindStyles = () => (
       animation: blockly-bounce 2s ease-in-out infinite;
     }
 
-    /* Estilos base scoped a .blockly-scope */
     .blockly-scope *,.blockly-scope ::before,.blockly-scope ::after{box-sizing:border-box;border-width:0;border-style:solid;border-color:#e5e7eb}
     .blockly-scope button,.blockly-scope input,.blockly-scope optgroup,.blockly-scope select,.blockly-scope textarea{font-family:inherit;font-size:100%;font-weight:inherit;line-height:inherit;color:inherit;margin:0;padding:0}
     .blockly-scope button,.blockly-scope select{text-transform:none}
@@ -839,7 +802,6 @@ const TailwindStyles = () => (
     .blockly-scope img,.blockly-scope video{max-width:100%;height:auto}
     .blockly-scope [hidden]{display:none}
 
-    /* Clases de utilidad scoped */
     .blockly-scope .relative{position:relative}
     .blockly-scope .mx-auto{margin-left:auto;margin-right:auto}
     .blockly-scope .mx-2{margin-left:.5rem;margin-right:.5rem}
@@ -979,7 +941,6 @@ const TailwindStyles = () => (
     .blockly-scope .flex-wrap{flex-wrap:wrap}
     .blockly-scope .transform{transform:translate(var(--tw-translate-x,0), var(--tw-translate-y,0)) rotate(var(--tw-rotate,0)) scale(var(--tw-scale-x,1), var(--tw-scale-y,1))}
 
-    /* Estilos adicionales para el workspace de Blockly */
     .blockly-workspace {
       width: 100%;
       height: 100%;
@@ -1000,12 +961,8 @@ const TailwindStyles = () => (
   `}</style>
 );
 
-// --- Estilos de RA ---
 const BlocklyARStyles = () => (
   <style>{`
-    /* ===================== */
-    /* Animaciones RA */
-    /* ===================== */
     @keyframes ra-pulse {
       0%, 100% { transform: scale(1); }
       50% { transform: scale(1.02); }
@@ -1016,9 +973,6 @@ const BlocklyARStyles = () => (
       50% { transform: translateY(-4px); }
     }
 
-    /* ===================== */
-    /* Contenedor principal RA */
-    /* ===================== */
     .ra-config-container {
       background: white;
       border-radius: 16px;
@@ -1043,9 +997,6 @@ const BlocklyARStyles = () => (
       margin-bottom: 1.5rem;
     }
 
-    /* ===================== */
-    /* Tarjetas de etapa RA */
-    /* ===================== */
     .ra-stage-list {
       display: grid;
       gap: 14px;
@@ -1137,9 +1088,6 @@ const BlocklyARStyles = () => (
       background-color: rgba(0, 119, 182, 0.18);
     }
 
-    /* ===================== */
-    /* Boton guardar RA */
-    /* ===================== */
     .ra-save-btn {
       background-color: var(--primary-color);
       color: white;
@@ -1158,9 +1106,6 @@ const BlocklyARStyles = () => (
       background-color: #0056b3;
     }
 
-    /* ===================== */
-    /* Three.js wrap */
-    /* ===================== */
     .ra-three-wrap {
       width: 100%;
       height: 240px;
@@ -1175,9 +1120,6 @@ const BlocklyARStyles = () => (
       height: 100%;
     }
 
-    /* ===================== */
-    /* AR Tabs y tarjetas */
-    /* ===================== */
     .ar-tabs {
       display: flex;
       gap: 0;
@@ -1375,9 +1317,6 @@ const BlocklyARStyles = () => (
       }
     }
 
-    /* ===================== */
-    /* Multi content layout for modals */
-    /* ===================== */
     .ar-multi-content {
       display: flex;
       flex-direction: column;
@@ -1506,9 +1445,6 @@ const BlocklyARStyles = () => (
       height: 1px;
     }
 
-    /* ===================== */
-    /* Modal RA Background */
-    /* ===================== */
     .blockly-ar-bg {
       position: relative;
       min-height: 220px;
@@ -1580,9 +1516,6 @@ const BlocklyARStyles = () => (
       z-index: 1;
     }
 
-    /* ===================== */
-    /* SweetAlert2 customizations */
-    /* ===================== */
     .swal2-popup {
       border-radius: 28px !important;
       width: auto;
@@ -1616,9 +1549,6 @@ const BlocklyARStyles = () => (
       background-color: rgba(0, 123, 255, 0.05) !important;
     }
 
-    /* ===================== */
-    /* Boton editar RA */
-    /* ===================== */
     .ra-edit-btn {
       background-color: rgba(0, 119, 182, 0.1);
       color: var(--dark-color);
@@ -1636,16 +1566,13 @@ const BlocklyARStyles = () => (
   `}</style>
 );
 
-// --- Título Animado ---
 const GameTitle = () => (
   <h1 className="font-bold text-center blockly-title-animate" style={{ color: '#023e8a', textShadow: '0 3px 6px rgba(0, 119, 182, 0.4)' }}>
     Blockly
   </h1>
 );
 
-// --- Base de Datos de Desafíos ---
 const ALL_CHALLENGES = [
-  // --- Básico ---
   {
     id: 'b1',
     title: 'Suma de dos números',
@@ -1662,7 +1589,7 @@ const ALL_CHALLENGES = [
       { input: [3, 1], expected: 4 },
     ],
     difficulty: 'Básico',
-    functionName: 'sumar', // Nombre que debe tener la función
+    functionName: 'sumar',
   },
   {
     id: 'b2',
@@ -1731,7 +1658,6 @@ const ALL_CHALLENGES = [
     difficulty: 'Básico',
     functionName: 'mostrarMensaje',
   },
-  // --- Intermedio ---
   {
     id: 'i1',
     title: 'Encontrar el número mayor',
@@ -1765,7 +1691,7 @@ const ALL_CHALLENGES = [
     testCases: [
       { input: [5], expected: 120 },
       { input: [1], expected: 1 },
-      { input: [0], expected: 1 }, // Por definición, 0! = 1
+      { input: [0], expected: 1 }, 
       { input: [3], expected: 6 },
     ],
     difficulty: 'Intermedio',
@@ -1850,7 +1776,6 @@ const ALL_CHALLENGES = [
     difficulty: 'Intermedio',
     functionName: 'contarPares',
   },
-  // --- Avanzado ---
   {
     id: 'a1',
     title: 'Fibonacci',
@@ -2012,26 +1937,24 @@ const ALL_CHALLENGES = [
   },
 ];
 
-// --- Configuración de Niveles ---
 const DIFFICULTY_SETTINGS = {
   Básico: {
     maxChallenges: 3,
-    time: 5 * 60, // 5 minutos
+    time: 5 * 60, 
     availableChallenges: ALL_CHALLENGES.filter(c => c.difficulty === 'Básico').slice(0, 5)
   },
   Intermedio: {
     maxChallenges: 4,
-    time: 10 * 60, // 10 minutos
+    time: 10 * 60, 
     availableChallenges: ALL_CHALLENGES.filter(c => c.difficulty === 'Intermedio').slice(0, 6)
   },
   Avanzado: {
     maxChallenges: 5,
-    time: 15 * 60, // 15 minutos
+    time: 15 * 60, 
     availableChallenges: ALL_CHALLENGES.filter(c => c.difficulty === 'Avanzado').slice(0, 8)
   }
 };
 
-// --- Definición del Toolbox de Blockly ---
 const toolboxXml = `
   <xml>
     <category name="Lógica" colour="#5C81A6">
@@ -2286,7 +2209,6 @@ const toolboxXml = `
   </xml>
 `;
 
-// --- Componente: Pantalla de Configuración (SetupScreen) ---
 const SetupScreen = ({ onGameStart, onEditAR }) => {
   const [difficulty, setDifficulty] = useState('Básico');
   const [selectedChallenges, setSelectedChallenges] = useState(new Set());
@@ -2294,7 +2216,7 @@ const SetupScreen = ({ onGameStart, onEditAR }) => {
 
   useEffect(() => {
     setSettings(DIFFICULTY_SETTINGS[difficulty]);
-    setSelectedChallenges(new Set()); // Resetear selección al cambiar dificultad
+    setSelectedChallenges(new Set()); 
   }, [difficulty]);
 
   const toggleChallenge = (challengeId) => {
@@ -2306,7 +2228,6 @@ const SetupScreen = ({ onGameStart, onEditAR }) => {
         if (newSelection.size < settings.maxChallenges) {
           newSelection.add(challengeId);
         } else {
-          // Opcional: Mostrar alerta si excede el máximo
           window.Swal.fire({
             title: 'Límite alcanzado',
             text: `Solo puedes seleccionar un máximo de ${settings.maxChallenges} desafíos para el nivel ${difficulty}.`,
@@ -2349,7 +2270,6 @@ const SetupScreen = ({ onGameStart, onEditAR }) => {
 
   return (
     <div className="w-full max-w-7xl mx-auto p-4 md:p-8">
-      {/* Botón Editar RA */}
       <div className="flex justify-end mb-4">
         <button
           onClick={onEditAR}
@@ -2359,7 +2279,6 @@ const SetupScreen = ({ onGameStart, onEditAR }) => {
         </button>
       </div>
 
-      {/* 1. Selección de Dificultad */}
       <div className="mb-8">
         <h2 className="text-xl font-semibold text-gray-800 mb-4">Selecciona el nivel de dificultad:</h2>
         <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
@@ -2377,7 +2296,6 @@ const SetupScreen = ({ onGameStart, onEditAR }) => {
       </div>
 
       <div className="flex flex-col md:flex-row gap-8">
-        {/* 2. Lista de Desafíos */}
         <div className="w-full md:w-2/3">
           <h2 className="text-xl font-semibold text-gray-800 mb-4">
             Selecciona los desafíos a realizar (Máximo {settings.maxChallenges}):
@@ -2397,7 +2315,6 @@ const SetupScreen = ({ onGameStart, onEditAR }) => {
           </div>
         </div>
 
-        {/* 3. Desafíos Seleccionados y Botón */}
         <div className="w-full md:w-1/3 flex flex-col justify-between">
           <div>
             <h2 className="text-xl font-semibold text-gray-800 mb-4">Desafíos seleccionados: {selectedChallenges.size} / {settings.maxChallenges}</h2>
@@ -2432,15 +2349,12 @@ const SetupScreen = ({ onGameStart, onEditAR }) => {
   );
 };
 
-// --- Componente: Espacio de Trabajo de Blockly ---
 const BlocklyWorkspace = ({ toolbox, onCodeUpdate }) => {
   const blocklyRef = useRef(null);
   const workspaceRef = useRef(null);
 
-  // Inicializar el workspace de Blockly
   useEffect(() => {
     if (window.Blockly && blocklyRef.current && !workspaceRef.current) {
-        // Asegurarse de que el idioma español está cargado
       window.Blockly.setLocale('es');
       
       workspaceRef.current = window.Blockly.inject(blocklyRef.current, {
@@ -2462,9 +2376,7 @@ const BlocklyWorkspace = ({ toolbox, onCodeUpdate }) => {
         }
       });
 
-      // Registrar el generador de código JavaScript
       if (window.Blockly.JavaScript) {
-        // Listener para actualizar el código en cada cambio
         workspaceRef.current.addChangeListener(() => {
           const code = window.Blockly.JavaScript.workspaceToCode(workspaceRef.current);
           onCodeUpdate(code);
@@ -2474,17 +2386,10 @@ const BlocklyWorkspace = ({ toolbox, onCodeUpdate }) => {
       }
     }
 
-    // Limpieza al desmontar
     return () => {
-      // No destruir el workspace para evitar errores en re-renders rápidos
-      // if (workspaceRef.current) {
-      //   workspaceRef.current.dispose();
-      //   workspaceRef.current = null;
-      // }
     };
   }, [toolbox, onCodeUpdate]);
   
-  // Redimensionar Blockly con la ventana
   useEffect(() => {
     const handleResize = () => {
       if (workspaceRef.current) {
@@ -2492,15 +2397,13 @@ const BlocklyWorkspace = ({ toolbox, onCodeUpdate }) => {
       }
     };
     window.addEventListener('resize', handleResize);
-    handleResize(); // Llamada inicial
+    handleResize(); 
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   return <div ref={blocklyRef} className="blockly-workspace blockly-dotted-grid" />;
 };
 
-
-// --- Componente: Pantalla de Juego (GameScreen) ---
 const GameScreen = ({ difficulty, challenges, totalTime, onGameEnd, arSelectedStages, arConfig, showARStageModal }) => {
   const [currentChallengeIndex, setCurrentChallengeIndex] = useState(0);
   const [score, setScore] = useState(0);
@@ -2511,7 +2414,6 @@ const GameScreen = ({ difficulty, challenges, totalTime, onGameEnd, arSelectedSt
 
   const currentChallenge = challenges[currentChallengeIndex];
 
-  // --- Funciones del Temporizador ---
   const stopTimer = () => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
@@ -2519,12 +2421,12 @@ const GameScreen = ({ difficulty, challenges, totalTime, onGameEnd, arSelectedSt
   };
 
   const startTimer = () => {
-    stopTimer(); // Asegurar que no haya múltiples temporizadores
+    stopTimer(); 
     timerRef.current = setInterval(() => {
       setTimeLeft(prevTime => {
         if (prevTime <= 1) {
           stopTimer();
-          handleTimeOut(); // handleTimeOut ya no necesita detener el timer
+          handleTimeOut(); 
           return 0;
         }
         return prevTime - 1;
@@ -2532,11 +2434,10 @@ const GameScreen = ({ difficulty, challenges, totalTime, onGameEnd, arSelectedSt
     }, 1000);
   };
 
-  // --- Lógica del Temporizador ---
   useEffect(() => {
     startTimer();
-    return () => stopTimer(); // Limpieza al desmontar el componente
-  }, []); // Se ejecuta solo una vez
+    return () => stopTimer(); 
+  }, []); 
 
   const handleTimeOut = () => {
     window.Swal.fire({
@@ -2549,45 +2450,40 @@ const GameScreen = ({ difficulty, challenges, totalTime, onGameEnd, arSelectedSt
     });
   };
 
-  // --- Finalizar Juego (Nuevo) ---
   const handleFinishGame = () => {
-    stopTimer(); // Pausar el temporizador
+    stopTimer(); 
     
     window.Swal.fire({
       title: '¿Estás seguro?',
       text: "Finalizarás el juego con tu puntuación actual.",
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#d33', // Rojo para confirmar
-      cancelButtonColor: '#3085d6', // Azul para cancelar
+      confirmButtonColor: '#d33', 
+      cancelButtonColor: '#3085d6', 
       confirmButtonText: 'Sí, finalizar',
       cancelButtonText: 'Cancelar'
     }).then((result) => {
       if (result.isConfirmed) {
-        // El usuario confirmó, mostrar mensaje final y terminar
         window.Swal.fire({
           title: '¡Puedes mejorar, Intenta nuevamente!',
           text: `Total: ${score} Puntos`,
           icon: 'info',
           allowOutsideClick: false,
         }).then(() => {
-          onGameEnd(score); // Enviar puntuación actual
+          onGameEnd(score); 
         });
       } else {
-        // El usuario canceló, reanudar el temporizador
         startTimer(); 
       }
     });
   };
 
-  // --- Formatear Tiempo ---
   const formatTime = (seconds) => {
     const minutes = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${minutes}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
-  // --- Ejecutar Solución ---
   const executeSolution = () => {
     const { testCases, functionName } = currentChallenge;
     let allCorrect = true;
@@ -2603,21 +2499,18 @@ const GameScreen = ({ difficulty, challenges, totalTime, onGameEnd, arSelectedSt
     }
 
     try {
-      // Crear la función en un scope controlado
-      // AÃ±adimos "var" para asegurar que la funciÃ³n se defina en el scope de "new Function"
       const userFunction = new Function(`${generatedCode.replace(`function ${functionName}`, `var ${functionName} = function`)} return ${functionName};`)();
 
       for (const testCase of testCases) {
         const result = userFunction(...testCase.input);
         const expected = testCase.expected;
         
-        // Comparación (simple, para arrays y primitivos)
         const isCorrect = JSON.stringify(result) === JSON.stringify(expected);
 
         if (!isCorrect) {
           allCorrect = false;
           resultsLog.push(`Falló: Entrada [${testCase.input.join(', ')}]. Esperado: ${JSON.stringify(expected)}, Recibido: ${JSON.stringify(result)}`);
-          break; // Detenerse al primer error
+          break; 
         } else {
            resultsLog.push(`Éxito: Entrada [${testCase.input.join(', ')}]. Recibido: ${JSON.stringify(result)}`);
         }
@@ -2628,7 +2521,6 @@ const GameScreen = ({ difficulty, challenges, totalTime, onGameEnd, arSelectedSt
       resultsLog.push(`Error de ejecución: ${error.message}`);
     }
     
-    // Mostrar resultado
     setExecutionResult({ 
       type: allCorrect ? 'success' : 'error', 
       message: resultsLog.join('\n') 
@@ -2641,7 +2533,6 @@ const GameScreen = ({ difficulty, challenges, totalTime, onGameEnd, arSelectedSt
     }
   };
   
-  // --- Modales ---
   const showIncorrectModal = () => {
      window.Swal.fire({
         title: 'Solución incorrecta,',
@@ -2654,7 +2545,6 @@ const GameScreen = ({ difficulty, challenges, totalTime, onGameEnd, arSelectedSt
     const newScore = score + 10;
     setScore(newScore);
 
-    // Mostrar modal de RA si está configurado
     const hasARContent = arSelectedStages?.Acierto && arConfig?.Acierto;
 
     if (hasARContent) {
@@ -2668,7 +2558,6 @@ const GameScreen = ({ difficulty, challenges, totalTime, onGameEnd, arSelectedSt
       });
 
       if (!result && currentChallengeIndex < challenges.length - 1) {
-        // Usuario canceló, finalizar juego
         stopTimer();
         window.Swal.fire({
           title: '¡Buen trabajo!',
@@ -2682,7 +2571,6 @@ const GameScreen = ({ difficulty, challenges, totalTime, onGameEnd, arSelectedSt
         return;
       }
     } else {
-      // Sin RA, mostrar modal normal
       await window.Swal.fire({
         title: 'Solución correcta',
         html: '¡Has obtenido!<br><b class="text-2xl text-green-700">10 Puntos</b>',
@@ -2692,13 +2580,11 @@ const GameScreen = ({ difficulty, challenges, totalTime, onGameEnd, arSelectedSt
       });
     }
 
-    // Mover al siguiente desafío o finalizar
     if (currentChallengeIndex < challenges.length - 1) {
       setCurrentChallengeIndex(prev => prev + 1);
-      setExecutionResult({ type: '', message: '' }); // Limpiar resultado
+      setExecutionResult({ type: '', message: '' });
     } else {
-      // Juego terminado
-      stopTimer(); // Detener tiempo
+      stopTimer(); 
       window.Swal.fire({
         title: '¡Felicidades, lo lograste!',
         text: `Total: ${newScore} Puntos`,
@@ -2713,7 +2599,6 @@ const GameScreen = ({ difficulty, challenges, totalTime, onGameEnd, arSelectedSt
 
   return (
     <div className="w-full h-full min-h-screen flex flex-col bg-gray-100">
-      {/* 1. Header Bar */}
       <div className="w-full bg-white shadow-md p-2 flex flex-wrap justify-center md:justify-between items-center gap-2">
         <div className="flex gap-2">
            <span className="text-white text-lg font-semibold px-4 py-2 rounded-lg shadow-md" style={{ backgroundColor: '#0077b6' }}>
@@ -2730,7 +2615,6 @@ const GameScreen = ({ difficulty, challenges, totalTime, onGameEnd, arSelectedSt
            <span className="text-white text-lg font-semibold px-4 py-2 rounded-lg shadow-md" style={{ backgroundColor: '#0077b6' }}>
              Puntuación: {score}
            </span>
-           {/* --- Botón Finalizar (NUEVO) --- */}
            <button
              onClick={handleFinishGame}
              className="bg-red-500 text-white text-lg font-semibold px-4 py-2 rounded-lg shadow-md transition-colors duration-200 hover:bg-red-600"
@@ -2741,10 +2625,8 @@ const GameScreen = ({ difficulty, challenges, totalTime, onGameEnd, arSelectedSt
         </div>
       </div>
 
-      {/* 2. Game Area */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-2 p-2 h-full">
         
-        {/* Panel Izquierdo: Desafío */}
         <div className="lg:col-span-1 bg-white rounded-lg shadow-lg p-4 overflow-y-auto max-h-[calc(100vh-80px)]">
           <h3 className="text-2xl font-bold text-gray-900 mb-3">{currentChallenge.title}</h3>
           <p className="text-gray-700 mb-4">{currentChallenge.description}</p>
@@ -2769,7 +2651,6 @@ const GameScreen = ({ difficulty, challenges, totalTime, onGameEnd, arSelectedSt
            </ul>
         </div>
 
-        {/* Panel Central: Blockly */}
         <div className="lg:col-span-2 bg-white rounded-lg shadow-lg overflow-hidden h-full">
           <BlocklyWorkspace 
             toolbox={toolboxXml} 
@@ -2777,7 +2658,6 @@ const GameScreen = ({ difficulty, challenges, totalTime, onGameEnd, arSelectedSt
           />
         </div>
 
-        {/* Panel Derecho: Resultado */}
         <div className="lg:col-span-1 bg-white rounded-lg shadow-lg p-4 flex flex-col">
           <h3 className="text-2xl font-bold text-gray-900 mb-3">Resultado</h3>
           <button
@@ -2801,24 +2681,17 @@ const GameScreen = ({ difficulty, challenges, totalTime, onGameEnd, arSelectedSt
   );
 };
 
-
-// --- Componente Principal (App) ---
 const BlocklyChallenge = () => {
-  // Three.js loaders
   const { ensureThree, ensureThreeTextAddons } = useThreeLoaders();
   const initThreeStage = useMemo(
     () => initThreeStageFactory({ ensureThree, ensureThreeTextAddons }),
     [ensureThree, ensureThreeTextAddons]
   );
 
-  // Estado del wizard: 'ar' -> 'setup' -> 'game'
-  // Siempre empieza en 'ar' para configurar primero la RA
   const [setupStep, setSetupStep] = useState("ar");
 
-  // Pestaña activa en la configuración de RA
   const [activeARTab, setActiveARTab] = useState(AR_STAGES[0] ?? "Acierto");
 
-  // Estado RA (solo Acierto)
   const [arSelectedStages, setArSelectedStages] = useState(() =>
     readJSON(LS.arStages, { Acierto: false })
   );
@@ -2827,7 +2700,6 @@ const BlocklyChallenge = () => {
     readJSON(LS.arConfig, { Acierto: {} })
   );
 
-  // Referencias para ObjectURLs de medios
   const mediaObjectUrlsRef = useRef({});
 
   useEffect(() => {
@@ -2839,7 +2711,6 @@ const BlocklyChallenge = () => {
     };
   }, []);
 
-  // Persistencia de RA
   useEffect(() => {
     writeJSON(LS.arStages, arSelectedStages);
   }, [arSelectedStages]);
@@ -2849,17 +2720,15 @@ const BlocklyChallenge = () => {
   }, [arConfig]);
 
   const [gameState, setGameState] = useState({
-    screen: 'setup', // 'setup', 'game'
+    screen: 'setup',
     difficulty: 'Básico',
     challenges: [],
     time: 0
   });
-  // Estados de carga separados
   const [isSwalLoaded, setIsSwalLoaded] = useState(false);
   const [isBlocklyLoaded, setIsBlocklyLoaded] = useState(false);
-  const [scriptsLoaded, setScriptsLoaded] = useState(false); // Este será 'true' cuando AMBOS estén listos
+  const [scriptsLoaded, setScriptsLoaded] = useState(false);
 
-  // --- Handlers RA ---
   const toggleARStage = (stage) => {
     setArSelectedStages((prev) => ({ ...prev, [stage]: !prev[stage] }));
   };
@@ -3233,7 +3102,6 @@ const BlocklyChallenge = () => {
   };
 
   const handleGameEnd = (finalScore) => {
-    // Volver a la pantalla de configuración
     setGameState({
       screen: 'setup',
       difficulty: 'Básico',
@@ -3242,18 +3110,15 @@ const BlocklyChallenge = () => {
     });
   };
 
-  // Callbacks para los loaders
   const onSwalLoaded = useCallback(() => setIsSwalLoaded(true), []);
   const onBlocklyLoaded = useCallback(() => setIsBlocklyLoaded(true), []);
 
-  // Efecto para unificar las cargas
   useEffect(() => {
     if (isSwalLoaded && isBlocklyLoaded) {
       setScriptsLoaded(true);
     }
   }, [isSwalLoaded, isBlocklyLoaded]);
 
-  // --- Renderizado de configuración RA ---
   const renderARConfig = () => (
     <div className="w-full max-w-2xl mx-auto p-4 md:p-8">
       <div className="ra-config-container">
