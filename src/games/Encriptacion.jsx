@@ -383,18 +383,8 @@ function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
       camera = new THREE.PerspectiveCamera(55, w / h, 0.1, 100);
       camera.position.set(0, 0, 6);
 
-      // Iluminación básica
-      const ambient = new THREE.AmbientLight(0xffffff, 0.8);
-      scene.add(ambient);
-      const dir = new THREE.DirectionalLight(0xffffff, 0.9);
-      dir.position.set(3, 5, 4);
-      scene.add(dir);
-
-      // Fondo "glow" (simple)
-      const bgGeo = new THREE.SphereGeometry(18, 32, 32);
-      const bgMat = new THREE.MeshBasicMaterial({ color: 0x1d4ed8, transparent: true, opacity: 0.12, side: THREE.BackSide });
-      const bg = new THREE.Mesh(bgGeo, bgMat);
-      scene.add(bg);
+      // Iluminación básica (solo para tipos que la necesiten)
+      // La iluminación se agrega por tipo específico, no globalmente
 
       // Funciones helper para Video
       const createGlowTexture = () => {
@@ -486,6 +476,13 @@ function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
 
       // Contenido por tipo
       if (stageCfg.type === "Texto") {
+        // Iluminación para texto 3D
+        const ambient = new THREE.AmbientLight(0xffffff, 1.2);
+        scene.add(ambient);
+        const dir = new THREE.DirectionalLight(0xffffff, 1.5);
+        dir.position.set(2, 3, 4);
+        scene.add(dir);
+
         const { FontLoader, TextGeometry } = await ensureThreeTextAddons();
 
         const loader = new FontLoader();
@@ -613,6 +610,13 @@ function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
       }
 
       if (stageCfg.type === "Video") {
+        // Iluminación para el portal del video
+        const ambient = new THREE.AmbientLight(0xffffff, 0.35);
+        scene.add(ambient);
+        const rim = new THREE.PointLight(0x7ffcff, 1.1);
+        rim.position.set(2.5, 2.2, 3.5);
+        scene.add(rim);
+
         videoEl = document.createElement("video");
         videoEl.src = stageCfg.videoUrl || "";
         videoEl.crossOrigin = "anonymous";
@@ -753,6 +757,13 @@ function initThreeStageFactory({ ensureThree, ensureThreeTextAddons }) {
       }
 
       if (stageCfg.type === "Audio") {
+        // Iluminación para audio
+        const ambient = new THREE.AmbientLight(0xffffff, 1.0);
+        scene.add(ambient);
+        const point = new THREE.PointLight(0xffffff, 1.4);
+        point.position.set(2, 3, 4);
+        scene.add(point);
+
         // Crear la nota musical 3D (igual que en CalculoMental.jsx)
         const noteMaterial = new THREE.MeshStandardMaterial({
           color: 0xffd166,
@@ -926,6 +937,123 @@ export default function Encriptacion() {
     return !!(cfg.text?.trim() || cfg.imageUrl?.trim() || cfg.audioUrl?.trim() || cfg.videoUrl?.trim());
   };
 
+  // Construye el HTML para mostrar TODOS los contenidos configurados en una etapa
+  const buildMultiContentHtml = (stageCfg, ids) => {
+    const cfg = normalizeStageConfig(stageCfg);
+
+    // Contar elementos visuales (sin audio)
+    const visualElements = [];
+    if (cfg.hasText) visualElements.push('text');
+    if (cfg.hasImage) visualElements.push('image');
+    if (cfg.hasVideo) visualElements.push('video');
+
+    const visualCount = visualElements.length;
+    const isAudioOnly = cfg.hasAudio && visualCount === 0;
+
+    // Construir elementos individuales
+    const textHtml = cfg.hasText ? `
+      <div class="ar-multi-text-3d">
+        <div id="${ids.textContainerId}" class="ar-three-container"></div>
+      </div>
+    ` : '';
+
+    const imageHtml = cfg.hasImage ? `
+      <div class="ar-multi-image">
+        <div id="${ids.imageContainerId}" class="ar-three-container"></div>
+      </div>
+    ` : '';
+
+    const videoHtml = cfg.hasVideo ? `
+      <div class="ar-multi-video">
+        <div id="${ids.videoContainerId}" class="ar-three-container"></div>
+      </div>
+    ` : '';
+
+    // Audio: nota musical cuando está solo, reproductor oculto cuando hay otros elementos
+    const audioHtml = cfg.hasAudio ? (
+      isAudioOnly
+        ? `<div class="ar-audio-solo">
+            <div class="ar-audio-icon">🎵</div>
+            <audio id="${ids.audioId || 'ar-audio-player'}" controls src="${escapeHtml(cfg.audioUrl)}" class="ar-audio-player"></audio>
+           </div>`
+        : `<div class="ar-audio-hidden">
+            <audio id="${ids.audioId || 'ar-audio-player'}" autoplay src="${escapeHtml(cfg.audioUrl)}" class="ar-audio-player-bg"></audio>
+           </div>`
+    ) : '';
+
+    // === LAYOUTS SEGÚN COMBINACIÓN ===
+
+    // 1 elemento visual: centrado
+    if (visualCount === 1) {
+      return `
+        <div class="ar-layout-single">
+          ${textHtml}${imageHtml}${videoHtml}
+        </div>
+        ${audioHtml}
+      `;
+    }
+
+    // Solo audio: nota musical centrada
+    if (isAudioOnly) {
+      return `
+        <div class="ar-layout-single">
+          ${audioHtml}
+        </div>
+      `;
+    }
+
+    // 2 elementos visuales
+    if (visualCount === 2) {
+      // Texto + Imagen: texto arriba, imagen abajo
+      if (cfg.hasText && cfg.hasImage) {
+        return `
+          <div class="ar-layout-text-top">
+            <div class="ar-row-text">${textHtml}</div>
+            <div class="ar-row-media">${imageHtml}</div>
+          </div>
+          ${audioHtml}
+        `;
+      }
+      // Texto + Video: texto arriba, video abajo
+      if (cfg.hasText && cfg.hasVideo) {
+        return `
+          <div class="ar-layout-text-top">
+            <div class="ar-row-text">${textHtml}</div>
+            <div class="ar-row-media">${videoHtml}</div>
+          </div>
+          ${audioHtml}
+        `;
+      }
+      // Imagen + Video: misma fila
+      if (cfg.hasImage && cfg.hasVideo) {
+        return `
+          <div class="ar-layout-row">
+            ${imageHtml}
+            ${videoHtml}
+          </div>
+          ${audioHtml}
+        `;
+      }
+    }
+
+    // 3 elementos visuales: Texto + Imagen + Video
+    if (visualCount === 3) {
+      return `
+        <div class="ar-layout-three">
+          <div class="ar-row-text">${textHtml}</div>
+          <div class="ar-row-media-pair">
+            ${imageHtml}
+            ${videoHtml}
+          </div>
+        </div>
+        ${audioHtml}
+      `;
+    }
+
+    // Fallback: apilar todo
+    return `${textHtml}${imageHtml}${videoHtml}${audioHtml}`;
+  };
+
   // Nota: los ObjectURL no sobreviven a un refresh. Si necesitas persistencia real,
   // conviene base64 o subir a servidor.
   const mediaObjectUrlsRef = useRef({});
@@ -1071,6 +1199,14 @@ export default function Encriptacion() {
     return { ok: true };
   };
 
+  const escapeHtml = (s = "") =>
+    String(s)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+
   const showStageModal = async (stage, swalOverrides = {}) => {
     // 1) Solo si la etapa está seleccionada
     if (!arSelectedStages?.[stage]) return true;
@@ -1097,29 +1233,10 @@ export default function Encriptacion() {
     let cleanupSymbols;
     let cameraStream;
 
-    // Construir HTML para múltiples contenidos
-    const buildMultiContentHtml = () => {
-      const parts = [];
-      if (cfg.hasText) {
-        parts.push(`<div class="enc-ar-content-item"><div id="${ids.textContainerId}" class="ra-three-canvas"></div></div>`);
-      }
-      if (cfg.hasImage) {
-        parts.push(`<div class="enc-ar-content-item"><div id="${ids.imageContainerId}" class="ra-three-canvas"></div></div>`);
-      }
-      if (cfg.hasVideo) {
-        parts.push(`<div class="enc-ar-content-item"><div id="${ids.videoContainerId}" class="ra-three-canvas"></div></div>`);
-      }
-      if (cfg.hasAudio && !cfg.hasText && !cfg.hasImage && !cfg.hasVideo) {
-        parts.push(`<div class="enc-ar-audio-solo"><audio id="${ids.audioId}" controls src="${escapeHtml(cfg.audioUrl)}" class="ar-audio-player"></audio></div>`);
-      } else if (cfg.hasAudio) {
-        parts.push(`<audio id="${ids.audioId}" autoplay src="${escapeHtml(cfg.audioUrl)}" style="display:none;"></audio>`);
-      }
-      return parts.join('');
-    };
-
+    const innerHtml = buildMultiContentHtml(stageCfg, ids);
     const html = buildDecoratedHtml({
       bgId,
-      innerHtml: `<div class="enc-ar-multi-content">${buildMultiContentHtml()}</div>`,
+      innerHtml: `<div class="ar-multi-content">${innerHtml}</div>`,
       useCamera,
       videoId,
     });
@@ -1161,14 +1278,6 @@ export default function Encriptacion() {
 
     return !!res?.isConfirmed;
   };
-
-  const escapeHtml = (s = "") =>
-    String(s)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#039;");
 
   const buildARStageSummaryHtml = (stage, stageCfg, isEnabled) => {
     const statusText = isEnabled ? "Habilitada" : "Deshabilitada";
@@ -1749,7 +1858,7 @@ export default function Encriptacion() {
         /* SweetAlert2 (RA Modals) */
         /* ======================= */
 
-        .swal2-popup { border-radius: 28px !important; }
+        .swal2-popup { border-radius: 28px !important; width: auto; }
         .swal2-title { font-family: 'Poppins', sans-serif; }
         .swal2-html-container { font-family: 'Poppins', sans-serif; }
         .swal2-cancel {
@@ -1788,13 +1897,17 @@ export default function Encriptacion() {
           height: 100%;
           object-fit: cover;
           z-index: 0;
-          border-radius: 28px;;
+          border-radius: 28px;
+          background: none;
         }
 
         .enc-ar-bg-elements {
           position: absolute;
           inset: 0;
           pointer-events: none;
+          background:
+            radial-gradient(circle at 20% 20%, rgba(255,255,255,0.1) 0%, transparent 50%),
+            radial-gradient(circle at 80% 80%, rgba(255,255,255,0.1) 0%, transparent 50%);
         }
 
         .enc-ar-content {
@@ -1839,7 +1952,6 @@ export default function Encriptacion() {
         .ra-three-canvas {
           width: 100%;
           height: 100%;
-          background: transparent;
         }
 
         /* ======================= */
@@ -2024,6 +2136,141 @@ export default function Encriptacion() {
           .ar-content-cards {
             grid-template-columns: 1fr;
           }
+        }
+
+        /* === Estilos para contenido múltiple en modales RA === */
+        .ar-multi-content {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 1rem;
+          width: 100%;
+          margin: 0;
+        }
+
+        /* Layout: 1 elemento centrado */
+        .ar-layout-single {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          width: 100%;
+        }
+
+        /* Layout: texto arriba, media abajo */
+        .ar-layout-text-top {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 1rem;
+          width: 100%;
+        }
+
+        .ar-layout-text-top .ar-row-text {
+          display: flex;
+          justify-content: center;
+          width: 100%;
+        }
+
+        .ar-layout-text-top .ar-row-media {
+          display: flex;
+          justify-content: center;
+          width: 100%;
+        }
+
+        /* Layout: elementos en fila (imagen + video) */
+        .ar-layout-row {
+          display: flex;
+          flex-direction: row;
+          justify-content: center;
+          align-items: center;
+          gap: 1.5rem;
+          width: 100%;
+          flex-wrap: wrap;
+        }
+
+        /* Layout: 3 elementos (texto arriba, imagen+video abajo) */
+        .ar-layout-three {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 1rem;
+          width: 100%;
+        }
+
+        .ar-layout-three .ar-row-text {
+          display: flex;
+          justify-content: center;
+          width: 100%;
+        }
+
+        .ar-layout-three .ar-row-media-pair {
+          display: flex;
+          flex-direction: row;
+          justify-content: center;
+          align-items: center;
+          gap: 1.5rem;
+          width: 100%;
+          flex-wrap: wrap;
+        }
+
+        .ar-multi-text-3d {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+        }
+
+        .ar-multi-image,
+        .ar-multi-video {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          border-radius: 12px;
+          overflow: hidden;
+        }
+
+        .ar-three-container {
+          width: 300px;
+          height: 200px;
+          border-radius: 12px;
+        }
+
+        /* Audio solo: nota musical centrada */
+        .ar-audio-solo {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 1rem;
+          padding: 1.5rem;
+          background: rgba(255, 255, 255, 0.95);
+          border-radius: 16px;
+        }
+
+        .ar-audio-icon {
+          font-size: 5rem;
+          animation: pulse-audio 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse-audio {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.1); opacity: 0.8; }
+        }
+
+        .ar-audio-solo .ar-audio-player {
+          width: 280px;
+          height: 40px;
+        }
+
+        /* Audio oculto (cuando hay otros elementos) */
+        .ar-audio-hidden {
+          position: absolute;
+          opacity: 0;
+          pointer-events: none;
+        }
+
+        .ar-audio-player-bg {
+          width: 1px;
+          height: 1px;
         }
       `}</style>
 
