@@ -1129,6 +1129,8 @@ const CalculoMental = () => {
     const initThreeForType = (container, type, content) => {
         let disposed = false;
         let renderer, scene, camera, frameId, videoEl;
+        let portalGroup, portalFrameGroup, portalGlow, portalParticles, portalParticleMeta;
+        let enableRootSpin = type !== "Video";
 
         const cleanup = () => {
             disposed = true;
@@ -1166,7 +1168,7 @@ const CalculoMental = () => {
 
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 100);
-            camera.position.z = 2.5;
+            camera.position.z = type === "Video" ? 3.2 : 2.5;
 
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setSize(width, height);
@@ -1293,21 +1295,196 @@ const CalculoMental = () => {
                 });
 
             } else if (type === "Video") {
+                const planeBaseSize = 2.8;
+
+                const createGlowTexture = () => {
+                    const canvas = document.createElement("canvas");
+                    const ctx = canvas.getContext("2d");
+                    if (!ctx) return null;
+                    canvas.width = 256;
+                    canvas.height = 256;
+                    const grad = ctx.createRadialGradient(128, 128, 10, 128, 128, 128);
+                    grad.addColorStop(0, "rgba(0, 255, 255, 0.45)");
+                    grad.addColorStop(0.45, "rgba(0, 200, 255, 0.2)");
+                    grad.addColorStop(1, "rgba(0, 140, 255, 0)");
+                    ctx.fillStyle = grad;
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    const texture = new THREE.CanvasTexture(canvas);
+                    texture.colorSpace = THREE.SRGBColorSpace;
+                    return texture;
+                };
+
+                const portalFrameMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x83f3ff,
+                    emissive: 0x40e0ff,
+                    emissiveIntensity: 0.85,
+                    roughness: 0.2,
+                    metalness: 0.2,
+                    transparent: true,
+                    opacity: 0.95,
+                });
+
+                const updatePortalFrame = (frameWidth, frameHeight) => {
+                    if (!portalFrameGroup) return;
+
+                    portalFrameGroup.children.forEach((child) => {
+                        if (child.geometry) child.geometry.dispose();
+                    });
+                    portalFrameGroup.clear();
+
+                    const thickness = 0.09;
+                    const depth = 0.18;
+                    const halfW = frameWidth / 2;
+                    const halfH = frameHeight / 2;
+
+                    const top = new THREE.Mesh(
+                        new THREE.BoxGeometry(frameWidth + thickness * 2, thickness, depth),
+                        portalFrameMaterial
+                    );
+                    top.position.set(0, halfH + thickness / 2, 0);
+                    portalFrameGroup.add(top);
+
+                    const bottom = new THREE.Mesh(
+                        new THREE.BoxGeometry(frameWidth + thickness * 2, thickness, depth),
+                        portalFrameMaterial
+                    );
+                    bottom.position.set(0, -halfH - thickness / 2, 0);
+                    portalFrameGroup.add(bottom);
+
+                    const left = new THREE.Mesh(
+                        new THREE.BoxGeometry(thickness, frameHeight, depth),
+                        portalFrameMaterial
+                    );
+                    left.position.set(-halfW - thickness / 2, 0, 0);
+                    portalFrameGroup.add(left);
+
+                    const right = new THREE.Mesh(
+                        new THREE.BoxGeometry(thickness, frameHeight, depth),
+                        portalFrameMaterial
+                    );
+                    right.position.set(halfW + thickness / 2, 0, 0);
+                    portalFrameGroup.add(right);
+
+                    if (portalParticles && portalParticleMeta) {
+                        const posAttr = portalParticles.geometry.getAttribute("position");
+                        const positions = posAttr.array;
+                        const baseRadius = Math.hypot(halfW, halfH) * 1.08;
+                        const depthScale = Math.min(0.5, baseRadius * 0.2);
+                        for (let i = 0; i < portalParticleMeta.length; i += 1) {
+                            const meta = portalParticleMeta[i];
+                            const radius = baseRadius * meta.radius;
+                            positions[i * 3] = Math.cos(meta.angle) * radius;
+                            positions[i * 3 + 1] = Math.sin(meta.angle) * radius;
+                            positions[i * 3 + 2] = meta.depth * depthScale;
+                        }
+                        posAttr.needsUpdate = true;
+                        if (portalParticles.material) {
+                            portalParticles.material.size = Math.max(0.04, baseRadius * 0.03);
+                        }
+                    }
+                };
+
+                const plane = new THREE.Mesh(
+                    new THREE.PlaneGeometry(1, 1),
+                    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true })
+                );
+
+                const fitPlaneToAspect = (aspect) => {
+                    if (!aspect) return;
+                    let planeWidth, planeHeight;
+                    if (aspect >= 1) {
+                        planeWidth = planeBaseSize;
+                        planeHeight = planeBaseSize / aspect;
+                    } else {
+                        planeWidth = planeBaseSize * aspect;
+                        planeHeight = planeBaseSize;
+                    }
+                    plane.scale.set(planeWidth, planeHeight, 1);
+                    if (portalGlow) portalGlow.scale.set(planeWidth * 1.3, planeHeight * 1.3, 1);
+                    updatePortalFrame(planeWidth, planeHeight);
+                };
+
                 videoEl = document.createElement("video");
                 videoEl.src = content;
                 videoEl.crossOrigin = "anonymous";
                 videoEl.loop = true;
                 videoEl.muted = true;
                 videoEl.playsInline = true;
-                videoEl.play().catch(() => {});
+                videoEl.preload = "auto";
 
                 const texture = new THREE.VideoTexture(videoEl);
                 texture.colorSpace = THREE.SRGBColorSpace;
-                const plane = new THREE.Mesh(
-                    new THREE.PlaneGeometry(2.5, 1.4),
-                    new THREE.MeshBasicMaterial({ map: texture, transparent: true })
-                );
-                root.add(plane);
+                plane.material = new THREE.MeshBasicMaterial({
+                    map: texture,
+                    transparent: true,
+                    opacity: 0.96,
+                });
+
+                // Iluminación
+                const ambient = new THREE.AmbientLight(0xffffff, 0.35);
+                scene.add(ambient);
+                const rim = new THREE.PointLight(0x7ffcff, 1.1);
+                rim.position.set(2.5, 2.2, 3.5);
+                scene.add(rim);
+
+                // Portal group
+                portalGroup = new THREE.Group();
+                plane.position.z = -0.06;
+                portalGroup.add(plane);
+
+                // Glow
+                const glowTexture = createGlowTexture();
+                if (glowTexture) {
+                    const glowMaterial = new THREE.MeshBasicMaterial({
+                        map: glowTexture,
+                        transparent: true,
+                        blending: THREE.AdditiveBlending,
+                        depthWrite: false,
+                    });
+                    portalGlow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), glowMaterial);
+                    portalGlow.position.z = -0.14;
+                    portalGroup.add(portalGlow);
+                }
+
+                // Marco
+                portalFrameGroup = new THREE.Group();
+                portalGroup.add(portalFrameGroup);
+
+                // Partículas
+                const particleCount = 160;
+                const positions = new Float32Array(particleCount * 3);
+                portalParticleMeta = [];
+                for (let i = 0; i < particleCount; i += 1) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const radius = 0.85 + Math.random() * 0.35;
+                    const depth = (Math.random() - 0.5);
+                    portalParticleMeta.push({ angle, radius, depth });
+                    positions[i * 3] = Math.cos(angle) * radius;
+                    positions[i * 3 + 1] = Math.sin(angle) * radius;
+                    positions[i * 3 + 2] = depth * 0.4;
+                }
+                const particleGeo = new THREE.BufferGeometry();
+                particleGeo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+                const particleMat = new THREE.PointsMaterial({
+                    color: 0x7df9ff,
+                    size: 0.05,
+                    transparent: true,
+                    opacity: 0.8,
+                    depthWrite: false,
+                    blending: THREE.AdditiveBlending,
+                });
+                portalParticles = new THREE.Points(particleGeo, particleMat);
+                portalGroup.add(portalParticles);
+
+                root.add(portalGroup);
+                fitPlaneToAspect(16 / 9);
+
+                videoEl.addEventListener("loadedmetadata", () => {
+                    if (videoEl.videoWidth && videoEl.videoHeight) {
+                        fitPlaneToAspect(videoEl.videoWidth / videoEl.videoHeight);
+                    }
+                });
+                videoEl.play().catch(() => {});
 
                 container.addEventListener("click", () => {
                     if (videoEl.paused) {
@@ -1321,7 +1498,22 @@ const CalculoMental = () => {
 
             const animate = () => {
                 if (disposed) return;
-                root.rotation.y += 0.008;
+                if (enableRootSpin) {
+                    root.rotation.y += 0.008;
+                }
+                if (portalGroup) {
+                    const now = performance.now();
+                    const floatY = Math.sin(now * 0.0011) * 0.06;
+                    const floatX = Math.cos(now * 0.0009) * 0.02;
+                    portalGroup.position.y = floatY;
+                    portalGroup.position.x = floatX;
+                    portalGroup.rotation.z = Math.sin(now * 0.0006) * 0.04;
+                    portalGroup.rotation.y = Math.cos(now * 0.0005) * 0.04;
+                }
+                if (portalParticles) {
+                    portalParticles.rotation.z += 0.002;
+                    portalParticles.rotation.y += 0.001;
+                }
                 frameId = requestAnimationFrame(animate);
                 renderer.render(scene, camera);
             };
@@ -2544,6 +2736,29 @@ const CalculoMental = () => {
                     font-weight: 600;
                     color: var(--dark-color);
                     font-size: 1.1rem;
+                    flex: 1;
+                }
+
+                .ar-delete-btn {
+                    background: #ff4757;
+                    color: white;
+                    border: none;
+                    border-radius: 50%;
+                    width: 24px;
+                    height: 24px;
+                    font-size: 14px;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: background 0.2s, transform 0.2s;
+                    padding: 0;
+                    line-height: 1;
+                }
+
+                .ar-delete-btn:hover {
+                    background: #ff6b7a;
+                    transform: scale(1.1);
                 }
 
                 .ar-card-body {
@@ -2769,6 +2984,15 @@ const CalculoMental = () => {
                                         <div className="ar-card-header">
                                             <span className="ar-card-icon">📝</span>
                                             <span className="ar-card-title">Texto</span>
+                                            {arConfig?.[activeARTab]?.text?.trim() && (
+                                                <button
+                                                    className="ar-delete-btn"
+                                                    onClick={() => setARStageField(activeARTab, "text", "")}
+                                                    title="Eliminar texto"
+                                                >
+                                                    ✕
+                                                </button>
+                                            )}
                                         </div>
                                         <div className="ar-card-body">
                                             <textarea
@@ -2786,6 +3010,15 @@ const CalculoMental = () => {
                                         <div className="ar-card-header">
                                             <span className="ar-card-icon">🖼️</span>
                                             <span className="ar-card-title">Imagen</span>
+                                            {arConfig?.[activeARTab]?.imageUrl?.trim() && (
+                                                <button
+                                                    className="ar-delete-btn"
+                                                    onClick={() => handleARStageFileChange(activeARTab, "imageUrl", null)}
+                                                    title="Eliminar imagen"
+                                                >
+                                                    ✕
+                                                </button>
+                                            )}
                                         </div>
                                         <div className="ar-card-body">
                                             <input
@@ -2815,6 +3048,15 @@ const CalculoMental = () => {
                                         <div className="ar-card-header">
                                             <span className="ar-card-icon">🎵</span>
                                             <span className="ar-card-title">Audio</span>
+                                            {arConfig?.[activeARTab]?.audioUrl?.trim() && (
+                                                <button
+                                                    className="ar-delete-btn"
+                                                    onClick={() => handleARStageFileChange(activeARTab, "audioUrl", null)}
+                                                    title="Eliminar audio"
+                                                >
+                                                    ✕
+                                                </button>
+                                            )}
                                         </div>
                                         <div className="ar-card-body">
                                             <input
@@ -2844,6 +3086,15 @@ const CalculoMental = () => {
                                         <div className="ar-card-header">
                                             <span className="ar-card-icon">🎬</span>
                                             <span className="ar-card-title">Video</span>
+                                            {arConfig?.[activeARTab]?.videoUrl?.trim() && (
+                                                <button
+                                                    className="ar-delete-btn"
+                                                    onClick={() => handleARStageFileChange(activeARTab, "videoUrl", null)}
+                                                    title="Eliminar video"
+                                                >
+                                                    ✕
+                                                </button>
+                                            )}
                                         </div>
                                         <div className="ar-card-body">
                                             <input
